@@ -1,0 +1,8 @@
+# build output
+/mdserve
+/dist/
+/tmp/
+
+# rendered static sites
+_site/
+*.md.html

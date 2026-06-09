@@ -1,0 +1,44 @@
+# GoReleaser config for mdserve. Tags a release -> cross-built binaries +
+# archives + a Homebrew tap. Run `goreleaser release --clean` from CI on a tag.
+#
+# Footgun: the Homebrew tap push needs a PAT with `repo` scope on the tap repo
+# stored as secret HOMEBREW_TAP_GITHUB_TOKEN — the default GITHUB_TOKEN cannot
+# push to a *separate* tap repository.
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mdserve
+    main: .
+    binary: mdserve
+    env: [CGO_ENABLED=0]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "mdserve_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+brews:
+  - name: mdserve
+    repository:
+      owner: mostafa-re
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/mostafa-re/mdserve
+    description: Tiny dependency-light Markdown docs server with live-reload
+    license: MIT
+
+release:
+  draft: false
