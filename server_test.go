@@ -136,8 +136,9 @@ func TestPageHasViewerControls(t *testing.T) {
 	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/guide/intro.md", nil))
 	body := rec.Body.String()
 	for _, want := range []string{
-		`id="theme"`,                                    // single theme cycle toggle
-		`id="zoomin"`, `id="zoomout"`, `id="zoomreset"`, // zoom controls
+		`class="brand"`, `mdserve</a>`, // program logo + name in the menubar
+		`id="theme"`,                                  // single theme cycle toggle
+		`id="zoomin"`, `id="zoomout"`, `id="zoomval"`, // zoom steppers + level input
 		`id="find"`, `#i-search`, // in-doc search + magnifier
 		`id="q"`, `#i-filter`, // file filter + funnel
 		`id="toggle"`, `id="resize"`, `id="top"`, // sidebar collapse, resize, back-to-top
