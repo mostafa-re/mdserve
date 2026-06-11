@@ -1,6 +1,4 @@
-<img src="favicon.svg" alt="mdserve" width="56" align="right">
-
-# mdserve
+# <img src="favicon.svg" alt="" width="28" align="absmiddle"> mdserve
 
 A tiny, dependency-light Markdown docs server. Point it at a directory of `.md`
 files and browse them as HTML with a live left-nav; or render them to a static
@@ -80,3 +78,7 @@ doc-build:  ## Render docs/ to docs/_site/
 
 > **Local docs only.** mdserve has no auth and renders raw repo Markdown; it
 > binds for local browsing. Never run it as a public/deployed service.
+
+## License
+
+[MIT](LICENSE).
