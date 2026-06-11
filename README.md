@@ -12,9 +12,15 @@ site.
   no-op when headless / over SSH / in CI.
 - **Live-reload on save** — the page reloads when any `.md` changes (mtime poll
   over SSE; no extra dependency, same on every OS).
-- **Polish** — nav filter box, dark mode (follows the OS), tables, and optional
-  syntax highlighting + Mermaid diagrams via CDN (`--no-cdn` for an offline-pure
-  page).
+- **Folder-tree nav** — collapsible directories with SVG file/folder icons
+  (open/closed), the branch to the current doc auto-expanded, plus a filter box.
+- **Collapsible + resizable sidebar** — toggle it shut, or drag its edge to
+  resize; the width and collapsed state persist in `localStorage`.
+- **Theme switch** — light / warm / dark with sun / sunrise / moon icons
+  (defaults to the OS scheme on first load), plus a back-to-top button.
+- **Request log** — each doc view prints `method path → status (latency)`.
+- **Polish** — tables and optional syntax highlighting + Mermaid diagrams via
+  CDN (`--no-cdn` for an offline-pure page).
 - **Static build** — `mdserve build` renders a self-contained HTML tree.
 - Path-traversal-safe; serves only `.md` under the configured root.
 

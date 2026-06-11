@@ -46,6 +46,12 @@ var version = "dev"
 // port. Loopback also keeps a local docs server off the LAN.
 const defaultAddr = "127.0.0.1:8080"
 
+// banner is printed once at serve start.
+const banner = `
+  ┌────────────────────────────────────────┐
+  │   mdserve · browse markdown as html     │
+  └────────────────────────────────────────┘`
+
 func main() {
 	args := os.Args[1:]
 	cmd := "serve"
@@ -90,11 +96,13 @@ func runServe(args []string) {
 	if srv.opts.LiveReload {
 		srv.startWatch()
 	}
+	fmt.Println(banner)
+	fmt.Printf("  %s\n\n", version)
 	fmt.Printf("mdserve: serving %s on %s\n", *dir, url)
 	if *open {
 		openBrowser(url)
 	}
-	httpSrv := &http.Server{Handler: srv} //nolint:gosec // local dev server
+	httpSrv := &http.Server{Handler: logRequests(srv)} //nolint:gosec // local dev server
 	if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		fatal(err)
 	}

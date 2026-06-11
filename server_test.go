@@ -109,6 +109,50 @@ func TestBuildStatic(t *testing.T) {
 	}
 }
 
+func TestBuildTreeNestsAndOrders(t *testing.T) {
+	srv, _ := newTestServer(t)
+	tree, err := srv.buildTree()
+	if err != nil {
+		t.Fatalf("buildTree: %v", err)
+	}
+	// Directories sort before files: guide/ then README.md.
+	if len(tree) != 2 {
+		t.Fatalf("top-level nodes = %d, want 2", len(tree))
+	}
+	if !tree[0].IsDir || tree[0].Name != "guide" || tree[0].Rel != "guide" {
+		t.Fatalf("first node = %+v, want dir guide", tree[0])
+	}
+	if len(tree[0].Children) != 1 || tree[0].Children[0].URL != "/docs/guide/intro.md" {
+		t.Fatalf("guide children = %+v, want one intro.md leaf", tree[0].Children)
+	}
+	if tree[1].IsDir || tree[1].URL != "/docs/README.md" {
+		t.Fatalf("second node = %+v, want README.md leaf", tree[1])
+	}
+}
+
+func TestPageHasViewerControls(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/guide/intro.md", nil))
+	body := rec.Body.String()
+	for _, want := range []string{
+		`data-set-theme="light"`, `data-set-theme="warm"`, `data-set-theme="dark"`, // theme switch
+		`id="toggle"`, `id="resize"`, `id="top"`, // sidebar collapse, resize, back-to-top
+		`#i-folder`, `#i-folder-open`, `#i-file`, // tree icons
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("rendered page missing %q", want)
+		}
+	}
+	// The branch leading to the active doc auto-opens, and its leaf is marked.
+	if !strings.Contains(body, "<details open>") {
+		t.Error("active doc's directory was not auto-opened")
+	}
+	if !strings.Contains(body, `data-n="guide/intro.md" class="active"`) {
+		t.Error("active doc leaf not marked active")
+	}
+}
+
 func TestDefaultAddrIsLoopback(t *testing.T) {
 	// The default listen addr must be a concrete loopback addr, never a wildcard
 	// (":8080"). A wildcard bind SUCCEEDS even when another process already holds

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
@@ -44,6 +45,21 @@ type Server struct {
 	clients map[chan struct{}]struct{} // live-reload subscribers
 }
 
+// tmplFuncs are the template helpers the page shell needs: hasPrefix (open the
+// dir on the active doc's path) and dict (pass multiple values into the
+// recursive "tree" sub-template).
+var tmplFuncs = template.FuncMap{
+	"hasPrefix": strings.HasPrefix,
+	"dict": func(pairs ...any) map[string]any {
+		m := make(map[string]any, len(pairs)/2)
+		for i := 0; i+1 < len(pairs); i += 2 {
+			key, _ := pairs[i].(string)
+			m[key] = pairs[i+1]
+		}
+		return m
+	},
+}
+
 // NewServer constructs a Server rooted at opts.Dir.
 func NewServer(opts Options) (*Server, error) {
 	if opts.DefaultDoc == "" {
@@ -58,7 +74,7 @@ func NewServer(opts Options) (*Server, error) {
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", abs)
 	}
-	tmpl, err := template.New("page").Parse(pageTmpl)
+	tmpl, err := template.New("page").Funcs(tmplFuncs).Parse(pageTmpl)
 	if err != nil {
 		return nil, fmt.Errorf("parse template: %w", err)
 	}
@@ -108,7 +124,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if title == "" {
 		title = filepath.Base(rel)
 	}
-	nav, err := s.buildNav()
+	tree, err := s.buildTree()
 	if err != nil {
 		http.Error(w, "nav: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -117,7 +133,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := pageData{
 		Title:      title,
 		Body:       template.HTML(renderMarkdown(raw)), //nolint:gosec // local docs
-		Nav:        nav,
+		Tree:       tree,
 		Active:     rel,
 		LiveReload: s.opts.LiveReload,
 		CDN:        !s.opts.NoCDN,
@@ -148,13 +164,21 @@ func extractTitle(src []byte) string {
 	return ""
 }
 
-type navEntry struct {
-	URL  string
-	Name string
+// treeNode is one entry in the nav folder tree: a directory (with Children) or a
+// leaf .md file (with URL). Rel is the slash path from docDir — for a dir it is
+// the dir path, used to auto-open the branch leading to the active doc.
+type treeNode struct {
+	Name     string
+	Rel      string
+	URL      string
+	IsDir    bool
+	Children []*treeNode
 }
 
-func (s *Server) buildNav() ([]navEntry, error) {
-	var entries []navEntry
+// buildTree walks the docs dir and assembles a nested folder tree of .md files,
+// directories first then files, alphabetical within each level.
+func (s *Server) buildTree() ([]*treeNode, error) {
+	root := &treeNode{IsDir: true}
 	err := filepath.WalkDir(s.docDir, func(p string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -172,20 +196,61 @@ func (s *Server) buildNav() ([]navEntry, error) {
 		if err != nil {
 			return err
 		}
-		entries = append(entries, navEntry{URL: urlPrefix + filepath.ToSlash(rel), Name: filepath.ToSlash(rel)})
+		insertPath(root, filepath.ToSlash(rel))
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
-	return entries, nil
+	sortTree(root)
+	return root.Children, nil
+}
+
+// insertPath threads a file's slash-relative path into the tree, creating
+// intermediate directory nodes as needed.
+func insertPath(root *treeNode, rel string) {
+	segs := strings.Split(rel, "/")
+	cur := root
+	for i, seg := range segs {
+		isFile := i == len(segs)-1
+		var child *treeNode
+		for _, c := range cur.Children {
+			if c.Name == seg && c.IsDir == !isFile {
+				child = c
+				break
+			}
+		}
+		if child == nil {
+			child = &treeNode{Name: seg, IsDir: !isFile, Rel: strings.Join(segs[:i+1], "/")}
+			if isFile {
+				child.URL = urlPrefix + rel
+			}
+			cur.Children = append(cur.Children, child)
+		}
+		cur = child
+	}
+}
+
+// sortTree orders each level: directories before files, alphabetical within.
+func sortTree(n *treeNode) {
+	sort.Slice(n.Children, func(i, j int) bool {
+		a, b := n.Children[i], n.Children[j]
+		if a.IsDir != b.IsDir {
+			return a.IsDir
+		}
+		return a.Name < b.Name
+	})
+	for _, c := range n.Children {
+		if c.IsDir {
+			sortTree(c)
+		}
+	}
 }
 
 type pageData struct {
 	Title      string
 	Body       template.HTML
-	Nav        []navEntry
+	Tree       []*treeNode
 	Active     string
 	LiveReload bool
 	CDN        bool
@@ -197,7 +262,7 @@ func (s *Server) BuildStatic(outDir string) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
-	nav, err := s.buildNav()
+	tree, err := s.buildTree()
 	if err != nil {
 		return err
 	}
@@ -232,10 +297,53 @@ func (s *Server) BuildStatic(outDir string) error {
 		data := pageData{
 			Title:  title,
 			Body:   template.HTML(renderMarkdown(raw)), //nolint:gosec // local docs
-			Nav:    nav,
+			Tree:   tree,
 			Active: filepath.ToSlash(rel),
 			CDN:    !s.opts.NoCDN,
 		}
 		return s.tmpl.Execute(f, data)
+	})
+}
+
+// statusWriter records the response status code (and preserves http.Flusher so
+// the live-reload SSE stream still flushes) for request logging.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// logRequests wraps h to print one line per doc view: method, path, status, and
+// latency. The live-reload SSE stream is skipped (it is long-lived and noisy).
+func logRequests(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == liveReloadPath {
+			h.ServeHTTP(w, r)
+			return
+		}
+		sw := &statusWriter{ResponseWriter: w}
+		start := time.Now()
+		h.ServeHTTP(sw, r)
+		if sw.status == 0 {
+			sw.status = http.StatusOK
+		}
+		fmt.Printf("mdserve: %s %s → %d (%s)\n", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Microsecond))
 	})
 }
