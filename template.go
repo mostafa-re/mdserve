@@ -1,34 +1,53 @@
 package main
 
-// pageTmpl is the single HTML shell: a collapsible, resizable left nav rendered
-// as a folder tree (SVG file/dir icons, open/closed dir state), the rendered
-// body, a one-button theme cycle (dark/light/warm), zoom controls, an in-doc
-// search, a file filter, a back-to-top button, optional CDN syntax-highlight +
-// mermaid, and an optional live-reload client. The "tree" sub-template recurses
-// over treeNode children. No JS framework — one inline script wires the
-// controls; theme, zoom, sidebar width/state, and per-doc scroll position
-// persist in localStorage.
+// pageTmpl is the single HTML shell: a top menubar (the doc title as brand on
+// the left, aligned over the sidebar, plus search / zoom / theme / sidebar
+// controls on the right), a collapsible + resizable left nav rendered as a
+// folder tree (SVG file/dir icons, open/closed dir state), the rendered body, a
+// back-to-top button, optional CDN syntax-highlight + mermaid, and an optional
+// live-reload client. The "tree" sub-template recurses over treeNode children.
+// No JS framework — one inline script wires the controls; theme, zoom, sidebar
+// width/state, and per-doc scroll position persist in localStorage.
 const pageTmpl = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}}</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f81f7'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23111111'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
   <script>try{var d=document.documentElement,s=localStorage;d.dataset.theme=s.getItem('mdserve-theme')||'dark';var z=s.getItem('mdserve-zoom');if(z)d.style.setProperty('--zoom',z);var w=s.getItem('mdserve-side-w');if(w)d.style.setProperty('--side-w',w+'px');}catch(e){}</script>
 {{if .CDN}}  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css" media="(prefers-color-scheme: light)">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
 {{end}}  <style>
-    :root{--side-w:300px;--zoom:1;--bg:#fff;--fg:#24292f;--muted:#57606a;--side:#f6f8fa;--line:#d0d7de;--accent:#0969da;--code:#f6f8fa}
+    :root{--side-w:300px;--bar-h:46px;--zoom:1;--bg:#fff;--fg:#24292f;--muted:#57606a;--side:#f6f8fa;--line:#d0d7de;--accent:#0969da;--code:#f6f8fa}
     :root[data-theme="light"]{--bg:#fff;--fg:#24292f;--muted:#57606a;--side:#f6f8fa;--line:#d0d7de;--accent:#0969da;--code:#f6f8fa}
     :root[data-theme="warm"]{--bg:#f4ece1;--fg:#4a4138;--muted:#877b6b;--side:#ece2d4;--line:#ddd1be;--accent:#b06a2c;--code:#ece2d4}
     :root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--side:#161b22;--line:#30363d;--accent:#2f81f7;--code:#161b22}
     *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;display:grid;grid-template-columns:var(--side-w) 1fr;min-height:100vh;background:var(--bg);color:var(--fg)}
-    nav{background:var(--side);padding:1rem;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--line);max-height:100vh;position:sticky;top:0;min-width:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+    /* top menubar: brand (over sidebar) + tools, one row aligned with the sidebar top */
+    #bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;height:var(--bar-h);background:var(--side);border-bottom:1px solid var(--line)}
+    .brand{flex:0 0 var(--side-w);width:var(--side-w);min-width:0;padding:0 1rem;font-weight:700;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tools{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:.3rem;padding:0 .7rem}
+    .tools button,#top{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:8px;cursor:pointer;padding:0}
+    .tools button:hover,#top:hover{color:var(--fg);border-color:var(--accent)}
+    #findbox{display:flex;align-items:center;gap:.2rem;height:32px;padding:0 .25rem 0 1.65rem;border:1px solid var(--line);background:var(--bg);border-radius:8px;position:relative}
+    #findbox:focus-within{border-color:var(--accent)}
+    #findbox .ibox-ic{position:absolute;left:.55rem;width:15px;height:15px;color:var(--muted);pointer-events:none}
+    #findbox input{border:0;background:transparent;color:var(--fg);width:150px;outline:none;font-size:.85rem;padding:0}
+    #findbox input::-webkit-search-cancel-button{display:none}
+    #findn{font-size:.72rem;color:var(--muted);min-width:2.2rem;text-align:right;white-space:nowrap}
+    #findclear{width:22px;height:22px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;border-radius:5px;padding:0}
+    #findclear:hover{color:var(--fg);background:var(--line)}
+    #findclear .ic{width:13px;height:13px}
+    #theme .ic{display:none}
+    :root[data-theme="light"] #theme .t-light{display:block}
+    :root[data-theme="warm"] #theme .t-warm{display:block}
+    :root[data-theme="dark"] #theme .t-dark{display:block}
+    #layout{display:grid;grid-template-columns:var(--side-w) 1fr;align-items:start}
+    nav{background:var(--side);padding:1rem;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--line);position:sticky;top:var(--bar-h);max-height:calc(100vh - var(--bar-h));min-width:0}
     body[data-collapsed="1"]{--side-w:0}
     body[data-collapsed="1"] nav{padding:0;border-right:0}
-    nav strong{display:block;margin-bottom:.5rem}
     .ibox{position:relative;display:flex;align-items:center}
     .ibox .ibox-ic{position:absolute;left:.5rem;width:15px;height:15px;color:var(--muted);pointer-events:none}
     .navfilter{margin-bottom:.5rem}
@@ -58,18 +77,7 @@ const pageTmpl = `<!doctype html>
     img{max-width:100%}
     mark.f{background:#fde047;color:#111;border-radius:2px;padding:0 .04em}
     mark.f.cur{box-shadow:0 0 0 2px var(--accent)}
-    #bar{position:fixed;top:.6rem;right:.7rem;display:flex;gap:.3rem;z-index:30}
-    #bar button,#top{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--line);background:var(--side);color:var(--muted);border-radius:8px;cursor:pointer;padding:0}
-    #bar button:hover,#top:hover{color:var(--fg);border-color:var(--accent)}
-    #findbox{display:flex;align-items:center;gap:.3rem;height:32px;padding:0 .45rem 0 1.6rem;border:1px solid var(--line);background:var(--side);border-radius:8px}
-    #findbox .ibox-ic{left:.5rem}
-    #findbox input{border:0;background:transparent;color:var(--fg);width:128px;outline:none;font-size:.82rem;padding:0}
-    #findn{font-size:.72rem;color:var(--muted);min-width:2.4rem;text-align:right;white-space:nowrap}
-    #theme .ic{display:none}
-    :root[data-theme="light"] #theme .t-light{display:block}
-    :root[data-theme="warm"] #theme .t-warm{display:block}
-    :root[data-theme="dark"] #theme .t-dark{display:block}
-    #resize{position:fixed;top:0;left:var(--side-w);width:8px;height:100vh;margin-left:-4px;cursor:col-resize;z-index:25}
+    #resize{position:fixed;top:var(--bar-h);left:var(--side-w);width:8px;height:calc(100vh - var(--bar-h));margin-left:-4px;cursor:col-resize;z-index:25}
     #resize:hover{background:var(--accent);opacity:.25}
     body[data-collapsed="1"] #resize{display:none}
     #top{position:fixed;right:.9rem;bottom:.9rem;width:40px;height:40px;border-radius:50%;opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:30}
@@ -88,26 +96,31 @@ const pageTmpl = `<!doctype html>
     <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13 9.6A5.5 5.5 0 1 1 6.4 3a4.3 4.3 0 0 0 6.6 6.6z"/></symbol>
     <symbol id="i-sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M6.5 3v10"/></symbol>
     <symbol id="i-search" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10 14.2 14.2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
     <symbol id="i-filter" viewBox="0 0 16 16"><path d="M2 3.5h12l-4.6 5.6v3.4l-2.8 1.5V9.1z"/></symbol>
     <symbol id="i-zoom-in" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10 14.2 14.2M6.8 4.8v4M4.8 6.8h4"/></symbol>
     <symbol id="i-zoom-out" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10 14.2 14.2M4.8 6.8h4"/></symbol>
     <symbol id="i-zoom-reset" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.7-3.8"/><path d="M13.3 3v2.4h-2.4"/></symbol>
   </svg>
-  <div id="bar">
-    <div id="findbox"><svg class="ic ibox-ic"><use href="#i-search"/></svg><input id="find" type="search" placeholder="search doc…" autocomplete="off" spellcheck="false"><span id="findn"></span></div>
-    <button id="zoomout" title="Zoom out" aria-label="Zoom out"><svg class="ic"><use href="#i-zoom-out"/></svg></button>
-    <button id="zoomreset" title="Reset zoom" aria-label="Reset zoom"><svg class="ic"><use href="#i-zoom-reset"/></svg></button>
-    <button id="zoomin" title="Zoom in" aria-label="Zoom in"><svg class="ic"><use href="#i-zoom-in"/></svg></button>
-    <button id="theme" title="Theme (dark / light / warm)" aria-label="Switch theme"><svg class="ic t-dark"><use href="#i-moon"/></svg><svg class="ic t-light"><use href="#i-sun"/></svg><svg class="ic t-warm"><use href="#i-warm"/></svg></button>
-    <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-sidebar"/></svg></button>
+  <header id="bar">
+    <strong class="brand">{{.Title}}</strong>
+    <div class="tools">
+      <div id="findbox"><svg class="ic ibox-ic"><use href="#i-search"/></svg><input id="find" type="text" placeholder="search doc…" autocomplete="off" spellcheck="false"><span id="findn"></span><button id="findclear" title="Clear search" aria-label="Clear search"><svg class="ic"><use href="#i-x"/></svg></button></div>
+      <button id="zoomout" title="Zoom out" aria-label="Zoom out"><svg class="ic"><use href="#i-zoom-out"/></svg></button>
+      <button id="zoomreset" title="Reset zoom" aria-label="Reset zoom"><svg class="ic"><use href="#i-zoom-reset"/></svg></button>
+      <button id="zoomin" title="Zoom in" aria-label="Zoom in"><svg class="ic"><use href="#i-zoom-in"/></svg></button>
+      <button id="theme" title="Theme (dark / light / warm)" aria-label="Switch theme"><svg class="ic t-dark"><use href="#i-moon"/></svg><svg class="ic t-light"><use href="#i-sun"/></svg><svg class="ic t-warm"><use href="#i-warm"/></svg></button>
+      <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-sidebar"/></svg></button>
+    </div>
+  </header>
+  <div id="layout">
+    <nav>
+      <div class="ibox navfilter"><svg class="ic ibox-ic"><use href="#i-filter"/></svg><input id="q" placeholder="filter docs…" autocomplete="off" spellcheck="false"></div>
+      <div id="nav">{{template "tree" (dict "Nodes" .Tree "Active" .Active)}}</div>
+    </nav>
+    <div id="resize" title="Drag to resize"></div>
+    <main>{{.Body}}</main>
   </div>
-  <nav>
-    <strong>{{.Title}}</strong>
-    <div class="ibox navfilter"><svg class="ic ibox-ic"><use href="#i-filter"/></svg><input id="q" placeholder="filter docs…" autocomplete="off" spellcheck="false"></div>
-    <div id="nav">{{template "tree" (dict "Nodes" .Tree "Active" .Active)}}</div>
-  </nav>
-  <div id="resize" title="Drag to resize"></div>
-  <main>{{.Body}}</main>
   <button id="top" title="Back to top" aria-label="Back to top"><svg class="ic"><use href="#i-up"/></svg></button>
   <script>
   (function(){
@@ -157,7 +170,7 @@ const pageTmpl = `<!doctype html>
         li.style.display=vis?'':'none';var dt=li.querySelector('details');if(dt&&v)dt.open=true});
     });
     // in-doc search
-    var marks=[],cur=-1,findn=document.getElementById('findn');
+    var marks=[],cur=-1,findn=document.getElementById('findn'),findclear=document.getElementById('findclear');
     function clearFind(){marks.forEach(function(m){var t=document.createTextNode(m.textContent);m.parentNode.replaceChild(t,m)});marks=[];cur=-1;if(main)main.normalize();if(findn)findn.textContent=''}
     function focusMark(){marks.forEach(function(m){m.classList.remove('cur')});if(cur<0||!marks[cur])return;marks[cur].classList.add('cur');marks[cur].scrollIntoView({block:'center',behavior:'smooth'});if(findn)findn.textContent=(cur+1)+'/'+marks.length}
     function step(d){if(!marks.length)return;cur=(cur+d+marks.length)%marks.length;focusMark()}
@@ -173,8 +186,11 @@ const pageTmpl = `<!doctype html>
       if(findn)findn.textContent=marks.length?('0/'+marks.length):'0';
       if(marks.length){cur=0;focusMark()}}
     var find=document.getElementById('find');
-    if(find){find.addEventListener('input',function(){doFind(find.value.trim())});
-      find.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();step(e.shiftKey?-1:1)}else if(e.key==='Escape'){find.value='';clearFind()}})}
+    function updClear(){if(findclear)findclear.style.display=find&&find.value?'inline-flex':'none'}
+    if(find){find.addEventListener('input',function(){doFind(find.value.trim());updClear()});
+      find.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();step(e.shiftKey?-1:1)}else if(e.key==='Escape'){find.value='';clearFind();updClear()}})}
+    if(findclear)findclear.addEventListener('click',function(){if(find){find.value='';find.focus()}clearFind();updClear()});
+    updClear();
   })();
   </script>
 {{if .CDN}}  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>

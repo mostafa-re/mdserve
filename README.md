@@ -1,3 +1,5 @@
+<img src="favicon.svg" alt="mdserve" width="56" align="right">
+
 # mdserve
 
 A tiny, dependency-light Markdown docs server. Point it at a directory of `.md`
