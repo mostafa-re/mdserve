@@ -1,15 +1,17 @@
 package main
 
-// pageTmpl is the single HTML shell: a clean, left-aligned top menubar (the
-// mdserve logo + name first, then in-doc search, a zoom stepper with an editable
-// level, the theme toggle, and the sidebar toggle), a collapsible + resizable
-// left nav rendered as a folder tree (SVG file/dir icons, open/closed dir
-// state), the rendered body, a back-to-top button, optional CDN
-// syntax-highlight + mermaid, and an optional live-reload client. The logo and
-// favicon recolor to the active theme (dark/light/warm). The "tree" sub-template
-// recurses over treeNode children. No JS framework — one inline script wires the
-// controls; theme, zoom, sidebar width/state, and per-doc scroll position
-// persist in localStorage.
+// pageTmpl is the single HTML shell: a clean top menubar split by a divider that
+// lines up with the sidebar's right border — the mdserve logo + name sit over
+// the sidebar; the controls sit over the content (left group: sidebar toggle,
+// zoom stepper with an editable level, reset zoom; right group: theme/view
+// toggle, then a right-aligned in-doc search). Below is a collapsible +
+// resizable left nav rendered as a folder tree (SVG file/dir icons, open/closed
+// dir state) that always fills the viewport height, the rendered body, a
+// back-to-top button, optional CDN syntax-highlight + mermaid, and an optional
+// live-reload client. The logo and favicon recolor to the active theme. The
+// "tree" sub-template recurses over treeNode children. No JS framework — one
+// inline script wires the controls; theme, zoom, sidebar width/state, and
+// per-doc scroll position persist in localStorage.
 const pageTmpl = `<!doctype html>
 <html lang="en">
 <head>
@@ -27,17 +29,19 @@ const pageTmpl = `<!doctype html>
     :root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--side:#161b22;--line:#30363d;--accent:#2f81f7;--code:#161b22}
     *{box-sizing:border-box}
     body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
-    /* clean, left-aligned top menubar */
-    #bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:.4rem;height:var(--bar-h);padding:0 .8rem;background:var(--side);border-bottom:1px solid var(--line)}
-    .brand{display:inline-flex;align-items:center;gap:.45rem;font-weight:700;font-size:.95rem;color:var(--fg);text-decoration:none}
+    /* top menubar: brand over the sidebar (divider aligns with the sidebar border), controls over the content */
+    #bar{position:sticky;top:0;z-index:30;display:flex;align-items:stretch;height:var(--bar-h);background:var(--side);border-bottom:1px solid var(--line)}
+    .brand{flex:0 0 var(--side-w);width:var(--side-w);min-width:0;display:inline-flex;align-items:center;gap:.45rem;padding:0 1rem;font-weight:700;font-size:.95rem;color:var(--fg);text-decoration:none;border-right:1px solid var(--line);overflow:hidden;white-space:nowrap}
     .brand .logo{width:22px;height:22px;flex:0 0 auto}
-    .sep{width:1px;height:22px;background:var(--line);margin:0 .25rem}
-    #bar>button{width:32px;height:32px;border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
-    #bar>button:hover{background:var(--line);color:var(--fg)}
+    body[data-collapsed="1"] .brand{border-right:0}
+    .tools{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:0 .7rem}
+    .grp{display:flex;align-items:center;gap:.4rem;min-width:0}
+    .grp>button{width:32px;height:32px;border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto}
+    .grp>button:hover{background:var(--line);color:var(--fg)}
     #findbox{display:flex;align-items:center;gap:.2rem;height:32px;padding:0 .25rem 0 1.65rem;border:1px solid var(--line);background:var(--bg);border-radius:8px;position:relative}
     #findbox:focus-within{border-color:var(--accent)}
     #findbox .ibox-ic{position:absolute;left:.55rem;width:15px;height:15px;color:var(--muted);pointer-events:none}
-    #findbox input{border:0;background:transparent;color:var(--fg);width:148px;outline:none;font-size:.85rem;padding:0}
+    #findbox input{border:0;background:transparent;color:var(--fg);width:160px;outline:none;font-size:.85rem;padding:0}
     #findn{font-size:.72rem;color:var(--muted);min-width:2.2rem;text-align:right;white-space:nowrap}
     #findclear{width:22px;height:22px;border:0;background:transparent;color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;border-radius:5px;padding:0}
     #findclear:hover{color:var(--fg);background:var(--line)}
@@ -51,7 +55,7 @@ const pageTmpl = `<!doctype html>
     :root[data-theme="warm"] #theme .t-warm{display:block}
     :root[data-theme="dark"] #theme .t-dark{display:block}
     #layout{display:grid;grid-template-columns:var(--side-w) 1fr;align-items:start}
-    nav{background:var(--side);padding:1rem;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--line);position:sticky;top:var(--bar-h);max-height:calc(100vh - var(--bar-h));min-width:0}
+    nav{background:var(--side);padding:1rem;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--line);position:sticky;top:var(--bar-h);height:calc(100vh - var(--bar-h));min-width:0}
     body[data-collapsed="1"]{--side-w:0}
     body[data-collapsed="1"] nav{padding:0;border-right:0}
     .ibox{position:relative;display:flex;align-items:center}
@@ -105,14 +109,21 @@ const pageTmpl = `<!doctype html>
     <symbol id="i-search" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10 14.2 14.2"/></symbol>
     <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
     <symbol id="i-filter" viewBox="0 0 16 16"><path d="M2 3.5h12l-4.6 5.6v3.4l-2.8 1.5V9.1z"/></symbol>
+    <symbol id="i-zoom-reset" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.7-3.8"/><path d="M13.3 3v2.4h-2.4"/></symbol>
   </svg>
   <header id="bar">
     <a class="brand" href="/" title="mdserve"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>mdserve</a>
-    <div class="sep"></div>
-    <div id="findbox"><svg class="ic ibox-ic"><use href="#i-search"/></svg><input id="find" type="text" placeholder="search doc…" autocomplete="off" spellcheck="false"><span id="findn"></span><button id="findclear" title="Clear search" aria-label="Clear search"><svg class="ic"><use href="#i-x"/></svg></button></div>
-    <div class="zoom"><button id="zoomout" title="Zoom out" aria-label="Zoom out">−</button><input id="zoomval" title="Zoom level (type a %)" aria-label="Zoom level" value="100%"><button id="zoomin" title="Zoom in" aria-label="Zoom in">+</button></div>
-    <button id="theme" title="Theme (dark / light / warm)" aria-label="Switch theme"><svg class="ic t-dark"><use href="#i-moon"/></svg><svg class="ic t-light"><use href="#i-sun"/></svg><svg class="ic t-warm"><use href="#i-warm"/></svg></button>
-    <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-sidebar"/></svg></button>
+    <div class="tools">
+      <div class="grp">
+        <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-sidebar"/></svg></button>
+        <div class="zoom"><button id="zoomout" title="Zoom out" aria-label="Zoom out">−</button><input id="zoomval" title="Zoom level (type a %)" aria-label="Zoom level" value="100%"><button id="zoomin" title="Zoom in" aria-label="Zoom in">+</button></div>
+        <button id="zoomreset" title="Reset zoom" aria-label="Reset zoom"><svg class="ic"><use href="#i-zoom-reset"/></svg></button>
+      </div>
+      <div class="grp">
+        <button id="theme" title="Theme (dark / light / warm)" aria-label="Switch theme"><svg class="ic t-dark"><use href="#i-moon"/></svg><svg class="ic t-light"><use href="#i-sun"/></svg><svg class="ic t-warm"><use href="#i-warm"/></svg></button>
+        <div id="findbox"><svg class="ic ibox-ic"><use href="#i-search"/></svg><input id="find" type="text" placeholder="search doc…" autocomplete="off" spellcheck="false"><span id="findn"></span><button id="findclear" title="Clear search" aria-label="Clear search"><svg class="ic"><use href="#i-x"/></svg></button></div>
+      </div>
+    </div>
   </header>
   <div id="layout">
     <nav>
@@ -139,13 +150,14 @@ const pageTmpl = `<!doctype html>
     var themeBtn=document.getElementById('theme');
     if(themeBtn)themeBtn.addEventListener('click',function(){var i=order.indexOf(root.dataset.theme);setTheme(order[(i+1)%order.length])});
     setTheme(root.dataset.theme||'dark');
-    // zoom — steppers plus an editable level indicator
-    var zi=document.getElementById('zoomin'),zo=document.getElementById('zoomout'),zv=document.getElementById('zoomval');
+    // zoom — steppers, an editable level indicator, and a reset
+    var zi=document.getElementById('zoomin'),zo=document.getElementById('zoomout'),zr=document.getElementById('zoomreset'),zv=document.getElementById('zoomval');
     function curZoom(){return parseFloat(getComputedStyle(root).getPropertyValue('--zoom'))||1}
     function renderZoom(){if(zv&&document.activeElement!==zv)zv.value=Math.round(curZoom()*100)+'%'}
     function setZoom(z){z=Math.min(2,Math.max(.5,Math.round(z*100)/100));root.style.setProperty('--zoom',z);save('mdserve-zoom',z);renderZoom()}
     if(zi)zi.addEventListener('click',function(){setZoom(curZoom()+.1)});
     if(zo)zo.addEventListener('click',function(){setZoom(curZoom()-.1)});
+    if(zr)zr.addEventListener('click',function(){setZoom(1)});
     if(zv){zv.addEventListener('change',function(){var n=parseInt(zv.value,10);if(n)setZoom(n/100);else renderZoom()});
       zv.addEventListener('keydown',function(e){if(e.key==='Enter')zv.blur()});
       zv.addEventListener('focus',function(){zv.select()});

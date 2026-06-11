@@ -137,8 +137,8 @@ func TestPageHasViewerControls(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		`class="brand"`, `mdserve</a>`, // program logo + name in the menubar
-		`id="theme"`,                                  // single theme cycle toggle
-		`id="zoomin"`, `id="zoomout"`, `id="zoomval"`, // zoom steppers + level input
+		`id="theme"`,                                                    // single theme cycle toggle
+		`id="zoomin"`, `id="zoomout"`, `id="zoomval"`, `id="zoomreset"`, // zoom steppers, level input, reset
 		`id="find"`, `#i-search`, // in-doc search + magnifier
 		`id="q"`, `#i-filter`, // file filter + funnel
 		`id="toggle"`, `id="resize"`, `id="top"`, // sidebar collapse, resize, back-to-top
