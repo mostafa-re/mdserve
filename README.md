@@ -16,8 +16,12 @@ site.
   (open/closed), the branch to the current doc auto-expanded, plus a filter box.
 - **Collapsible + resizable sidebar** — toggle it shut, or drag its edge to
   resize; the width and collapsed state persist in `localStorage`.
-- **Theme switch** — light / warm / dark with sun / sunrise / moon icons
-  (defaults to the OS scheme on first load), plus a back-to-top button.
+- **Theme toggle** — one button cycles dark → light → warm (defaults to dark),
+  plus zoom in/out/reset and a back-to-top button.
+- **In-doc search** — find-and-highlight within the current doc (Enter / Shift+
+  Enter to step, with a match counter), separate from the file filter.
+- **Remembers where you were** — per-doc scroll position is restored, so paging
+  between docs doesn't jump you back to the top.
 - **Request log** — each doc view prints `method path → status (latency)`.
 - **Polish** — tables and optional syntax highlighting + Mermaid diagrams via
   CDN (`--no-cdn` for an offline-pure page).

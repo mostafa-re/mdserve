@@ -136,9 +136,14 @@ func TestPageHasViewerControls(t *testing.T) {
 	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/guide/intro.md", nil))
 	body := rec.Body.String()
 	for _, want := range []string{
-		`data-set-theme="light"`, `data-set-theme="warm"`, `data-set-theme="dark"`, // theme switch
+		`id="theme"`,                                    // single theme cycle toggle
+		`id="zoomin"`, `id="zoomout"`, `id="zoomreset"`, // zoom controls
+		`id="find"`, `#i-search`, // in-doc search + magnifier
+		`id="q"`, `#i-filter`, // file filter + funnel
 		`id="toggle"`, `id="resize"`, `id="top"`, // sidebar collapse, resize, back-to-top
 		`#i-folder`, `#i-folder-open`, `#i-file`, // tree icons
+		`rel="icon"`,                // favicon
+		`data-doc="guide/intro.md"`, // per-doc scroll-memory key
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("rendered page missing %q", want)
