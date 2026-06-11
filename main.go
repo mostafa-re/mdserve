@@ -23,7 +23,7 @@ usage:
 
 serve flags:
   --dir string          directory of .md files (default "docs")
-  --addr string         listen address; falls back to a free port if taken (default ":8080")
+  --addr string         listen address; falls back to a free port if taken (default "127.0.0.1:8080")
   --default-doc string  doc opened at / (default "README.md")
   --open                open the default browser at the served URL
   --no-cdn              don't reference CDN assets (mermaid / highlight.js)
@@ -38,6 +38,13 @@ build flags:
 
 // version is overridable via -ldflags -X main.version=...
 var version = "dev"
+
+// defaultAddr binds loopback, not the wildcard ":8080". A wildcard bind succeeds
+// even when another process already holds 127.0.0.1:8080, which would shadow the
+// advertised http://127.0.0.1:8080/ URL with that other process's responses; a
+// loopback bind instead fails with EADDRINUSE so listen() falls back to a free
+// port. Loopback also keeps a local docs server off the LAN.
+const defaultAddr = "127.0.0.1:8080"
 
 func main() {
 	args := os.Args[1:]
@@ -64,7 +71,7 @@ func main() {
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	dir := fs.String("dir", "docs", "directory of .md files")
-	addr := fs.String("addr", ":8080", "listen address (free-port fallback if taken)")
+	addr := fs.String("addr", defaultAddr, "listen address (free-port fallback if taken)")
 	defDoc := fs.String("default-doc", "README.md", "doc opened at /")
 	open := fs.Bool("open", false, "open the browser")
 	noCDN := fs.Bool("no-cdn", false, "no CDN assets")

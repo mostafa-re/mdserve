@@ -6,7 +6,7 @@ site.
 
 ## Features
 
-- **Free-port fallback** — if `:8080` is taken, grabs an OS-assigned free port
+- **Free-port fallback** — if `127.0.0.1:8080` is taken, grabs an OS-assigned free port
   (`net.Listen` on `:0`, race-free) and prints the URL.
 - **Browser auto-open** (`--open`) — `open` / `xdg-open` / `rundll32`,
   no-op when headless / over SSH / in CI.
@@ -39,7 +39,7 @@ mdserve serve --dir docs --default-doc plan/README.md   # custom landing doc
 | flag | default | notes |
 |---|---|---|
 | `--dir` | `docs` | directory of `.md` files |
-| `--addr` | `:8080` | falls back to a free port if taken |
+| `--addr` | `127.0.0.1:8080` | loopback only; falls back to a free port if taken |
 | `--default-doc` | `README.md` | doc opened at `/` |
 | `--open` | off | open the browser |
 | `--no-cdn` | off | omit Mermaid/highlight.js CDN assets |

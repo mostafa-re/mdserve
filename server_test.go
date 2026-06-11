@@ -109,6 +109,23 @@ func TestBuildStatic(t *testing.T) {
 	}
 }
 
+func TestDefaultAddrIsLoopback(t *testing.T) {
+	// The default listen addr must be a concrete loopback addr, never a wildcard
+	// (":8080"). A wildcard bind SUCCEEDS even when another process already holds
+	// 127.0.0.1:<port>, so the free-port fallback never fires — yet the advertised
+	// http://127.0.0.1:<port>/ URL is then served by that other process (observed
+	// in the wild: a local proxy on :8080 answering 400 to every request). Binding
+	// loopback makes net.Listen fail with EADDRINUSE so listen() falls back to a
+	// genuinely free port.
+	host, _, err := net.SplitHostPort(defaultAddr)
+	if err != nil {
+		t.Fatalf("SplitHostPort(%q): %v", defaultAddr, err)
+	}
+	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+		t.Fatalf("default addr host = %q, want a loopback IP so the free-port fallback engages when the port is busy", host)
+	}
+}
+
 func TestListenFreePortFallback(t *testing.T) {
 	// Occupy a port, then ask listen() for it — it must fall back to a free one.
 	busy, err := net.Listen("tcp", "127.0.0.1:0")
