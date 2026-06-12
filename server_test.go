@@ -164,6 +164,37 @@ func TestAPIPoll(t *testing.T) {
 	}
 }
 
+func TestFileServed(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "README.md"), "# H\n")
+	mustWrite(t, filepath.Join(dir, "img", "logo.png"), "\x89PNG\r\n\x1a\nfake")
+	mustWrite(t, filepath.Join(dir, "d.svg"), `<svg xmlns="http://www.w3.org/2000/svg"/>`)
+	srv, err := NewServer(Options{Dir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		path, wantCT string
+	}{
+		{"img/logo.png", "image/png"},
+		{"d.svg", "image/svg+xml"},
+	}
+	for _, c := range cases {
+		rec := get(t, srv, "/file?path="+c.path)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s status = %d, want 200", c.path, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, c.wantCT) {
+			t.Errorf("%s content-type = %q, want %q", c.path, ct, c.wantCT)
+		}
+	}
+	for _, bad := range []string{"../../etc/hosts", "nope.png", "img"} {
+		if get(t, srv, "/file?path="+bad).Code == http.StatusOK {
+			t.Errorf("path %q should not 200", bad)
+		}
+	}
+}
+
 func TestFaviconServed(t *testing.T) {
 	srv, _ := newTestServer(t)
 	for _, p := range []string{"/favicon.svg", "/favicon.ico"} {

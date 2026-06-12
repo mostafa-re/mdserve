@@ -93,6 +93,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.flattenMtimes())
 	case p == "/raw":
 		s.serveRaw(w, r)
+	case p == "/file":
+		s.serveFile(w, r)
 	case strings.HasPrefix(p, "/vendor/"):
 		serveVendor(w, r, strings.TrimPrefix(p, "/vendor/"))
 	default:
@@ -124,20 +126,38 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-// resolveMd maps a slash rel path to an absolute .md file inside docDir, or
-// returns ok=false. path.Clean on a rooted copy neutralizes "../" traversal,
+// serveFile serves any file referenced by a doc (images, etc.) from ?path=<rel>,
+// resolved safely inside docDir — so ![](diagram.png), <img src="x.svg"> and
+// links to local assets work. http.ServeFile handles content types and ranges.
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
+	full, ok := s.resolvePath(r.URL.Query().Get("path"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, full)
+}
+
+// resolvePath maps a slash rel path to an absolute file (any type) inside docDir,
+// or returns ok=false. path.Clean on a rooted copy neutralizes "../" traversal,
 // and a prefix check guards against any residual escape.
-func (s *Server) resolveMd(rel string) (string, bool) {
+func (s *Server) resolvePath(rel string) (string, bool) {
 	clean := filepath.FromSlash(path.Clean("/" + rel))
 	full := filepath.Join(s.docDir, clean)
 	sep := string(filepath.Separator)
 	if full != s.docDir && !strings.HasPrefix(full+sep, s.docDir+sep) {
 		return "", false
 	}
-	if !strings.HasSuffix(strings.ToLower(full), ".md") {
+	if info, err := os.Stat(full); err != nil || info.IsDir() {
 		return "", false
 	}
-	if info, err := os.Stat(full); err != nil || info.IsDir() {
+	return full, true
+}
+
+// resolveMd is resolvePath restricted to .md files.
+func (s *Server) resolveMd(rel string) (string, bool) {
+	full, ok := s.resolvePath(rel)
+	if !ok || !strings.HasSuffix(strings.ToLower(full), ".md") {
 		return "", false
 	}
 	return full, true

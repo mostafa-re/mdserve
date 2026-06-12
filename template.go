@@ -550,8 +550,15 @@ function enhance(relpath){
         const clean = href.split("#")[0];
         openFile(normalizePath(dir+clean)); };
     } else {
+      a.setAttribute("href", fileURL(dir+href.split("#")[0]));
       a.target="_blank"; a.rel="noopener noreferrer";
     }
+  });
+  // local images / assets (png, svg, gif, …) → served from disk via /file,
+  // resolved relative to this doc's directory; skip absolute / data / anchor srcs
+  page.querySelectorAll("img[src]").forEach(img=>{
+    const src=img.getAttribute("src");
+    if(src && !/^([a-z]+:|\/\/|\/|data:|#)/i.test(src)) img.setAttribute("src", fileURL(dir+src));
   });
   page.querySelectorAll("table").forEach(t=>{
     if(t.parentElement && t.parentElement.classList.contains("table-wrap")) return;
@@ -566,6 +573,8 @@ function normalizePath(p){
     if(seg===".."){ out.pop(); } else if(seg!=="." && seg!=="") out.push(seg);
   } return out.join("/");
 }
+// URL for a local asset (image, etc.) served by the backend, relative to a doc
+const fileURL = p => "/file?path=" + encodeURIComponent(normalizePath(p));
 
 /* scroll viewport so an element reaches the top — works through #page's transform */
 function scrollToEl(el){
