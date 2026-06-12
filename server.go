@@ -186,6 +186,20 @@ func buildAPITree(absDir, rel string) []apiNode {
 	return out
 }
 
+// stats counts the .md files served and the distinct directories that contain
+// them (including the root) — reported at startup.
+func (s *Server) stats() (files, dirs int) {
+	m := s.flattenMtimes()
+	files = len(m)
+	seen := map[string]struct{}{".": {}}
+	for rel := range m {
+		for d := path.Dir(rel); d != "." && d != "/" && d != ""; d = path.Dir(d) {
+			seen[d] = struct{}{}
+		}
+	}
+	return files, len(seen)
+}
+
 func relJoin(rel, name string) string {
 	if rel == "" {
 		return name
@@ -276,21 +290,80 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// logRequests wraps h to print one line per request (method, path, status,
-// latency). The high-frequency poll and the static vendor assets are skipped so
-// the log stays a readable record of doc views.
+// useColor enables ANSI coloring when stdout is a terminal and NO_COLOR is unset.
+var useColor = func() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}()
+
+// paint wraps s in an ANSI SGR code (no-op when color is disabled).
+func paint(code, s string) string {
+	if !useColor {
+		return s
+	}
+	return "\x1b[" + code + "m" + s + "\x1b[0m"
+}
+
+func statusColor(c int) string {
+	switch {
+	case c >= 500:
+		return "31" // red
+	case c >= 400:
+		return "33" // yellow
+	case c >= 300:
+		return "36" // cyan
+	default:
+		return "32" // green
+	}
+}
+
+func durColor(d time.Duration) string {
+	switch {
+	case d < time.Millisecond:
+		return "90" // gray (fast)
+	case d < 25*time.Millisecond:
+		return "32" // green
+	case d < 150*time.Millisecond:
+		return "33" // yellow
+	default:
+		return "31" // red
+	}
+}
+
+// logRequests prints one aligned, colorized line per request — like a structured
+// access logger:
+//
+//	15:04:05.000  200  GET   1.204ms  /raw?path=README.md
+//
+// Columns: time (gray), status (by class), method (gray), duration (by speed),
+// path. The 2s poll and the static vendor assets are skipped so the log stays a
+// readable record of page / doc / API views.
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/poll" || strings.HasPrefix(r.URL.Path, "/vendor/") {
 			h.ServeHTTP(w, r)
 			return
 		}
-		sw := &statusWriter{ResponseWriter: w}
 		start := time.Now()
+		sw := &statusWriter{ResponseWriter: w}
 		h.ServeHTTP(sw, r)
 		if sw.status == 0 {
 			sw.status = http.StatusOK
 		}
-		fmt.Printf("mdserve: %s %s → %d (%s)\n", r.Method, r.URL.Path, sw.status, time.Since(start).Round(time.Microsecond))
+		dur := time.Since(start).Round(time.Microsecond)
+		target := r.URL.Path
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		fmt.Printf("%s  %s  %s  %s  %s\n",
+			paint("90", start.Format("15:04:05.000")),
+			paint(statusColor(sw.status), fmt.Sprintf("%3d", sw.status)),
+			paint("90", fmt.Sprintf("%-4s", r.Method)),
+			paint(durColor(dur), fmt.Sprintf("%10s", dur.String())),
+			target,
+		)
 	})
 }

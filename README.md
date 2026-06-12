@@ -26,35 +26,55 @@ network.
   diagrams, and KaTeX math, all from the embedded bundle.
 - **Remembers where you were** — per-doc scroll position is restored.
 - **Live-reload** — the page polls for `.md` changes and re-renders in place.
-- **Browser auto-open** (`--open`); a **request log** prints each doc view.
+- **Browser auto-open** (`--open`); a **colorized, columnar request log**
+  (time · status · method · duration · path).
 - **Static build** — `mdserve build` renders a self-contained, offline HTML
   tree (the vendor bundle is copied alongside).
 - Path-traversal-safe; serves only `.md` under the configured root.
 
 ## Install
 
-```sh
-# prebuilt binary (Linux / macOS, amd64 or arm64) → ~/.local/bin
-curl -fsSL https://raw.githubusercontent.com/mostafa-re/mdserve/main/scripts/install.sh | sh
+No toolchain needed — grab a prebuilt binary:
 
-# or with Go
-go install github.com/mostafa-re/mdserve@latest
+```sh
+curl -fsSL https://raw.githubusercontent.com/mostafa-re/mdserve/main/scripts/install.sh | sh
 ```
 
-Windows: grab the `.zip` for your arch from the
-[releases page](https://github.com/mostafa-re/mdserve/releases). Set
-`MDSERVE_VERSION` / `MDSERVE_BINDIR` to pin a version or change the install dir.
+Detects your OS/arch and installs to `~/.local/bin` (override with
+`MDSERVE_VERSION` / `MDSERVE_BINDIR`).
 
-Update in place, or just check:
+### Releases
+
+Every `vX.Y.Z` tag ships prebuilt archives — **macOS, Linux, Windows ×
+amd64/arm64**, each with a SHA-256 sum — on the
+[releases page](https://github.com/mostafa-re/mdserve/releases). Download the one
+for your platform, unpack it, and put `mdserve` (or `mdserve.exe`) on your
+`PATH`; on Windows use the `.zip`.
+
+| OS | Arch | Asset |
+|---|---|---|
+| macOS | Apple Silicon | `mdserve_<tag>_darwin_arm64.tar.gz` |
+| macOS | Intel | `mdserve_<tag>_darwin_amd64.tar.gz` |
+| Linux | x86-64 | `mdserve_<tag>_linux_amd64.tar.gz` |
+| Linux | ARM64 | `mdserve_<tag>_linux_arm64.tar.gz` |
+| Windows | x86-64 | `mdserve_<tag>_windows_amd64.zip` |
+| Windows | ARM64 | `mdserve_<tag>_windows_arm64.zip` |
+
+### Update
 
 ```sh
-mdserve update          # download + replace the running binary with the latest release
+mdserve update          # replace the running binary with the latest release
 mdserve update --check  # only report whether a newer release exists
 mdserve version         # release tag, or dev+<commit> for a source build
 ```
 
-Every `vX.Y.Z` tag is built for darwin/linux/windows × amd64/arm64 by GitHub
-Actions and attached to the release (see `.github/workflows/release.yml`).
+<details><summary>Build from source (needs Go)</summary>
+
+```sh
+go install github.com/mostafa-re/mdserve@latest
+```
+
+</details>
 
 ## Usage
 

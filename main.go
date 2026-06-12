@@ -151,10 +151,12 @@ func runServe(args []string) {
 		fatal(err)
 	}
 	url := "http://" + shown + "/"
+	files, dirs := srv.stats()
 	fmt.Println(banner)
 	fmt.Printf("  %s\n", versionString())
-	fmt.Printf("  dir: %s\n\n", srv.docDir)
-	fmt.Printf("mdserve: serving on %s\n", url)
+	fmt.Printf("  %s\n", srv.docDir)
+	fmt.Printf("  %s · %s\n\n", pl(files, "markdown file", "markdown files"), pl(dirs, "directory", "directories"))
+	fmt.Printf("  ➜  %s\n\n", url)
 	if *open {
 		openBrowser(url)
 	}
@@ -199,7 +201,7 @@ func listen(addr string) (net.Listener, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		fmt.Fprintf(os.Stderr, "mdserve: %s busy — using a free port\n", addr)
+		// the requested port was busy — fall back to a free one, quietly.
 	}
 	return ln, displayAddr(ln), nil
 }
@@ -218,4 +220,12 @@ func displayAddr(ln net.Listener) string {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "mdserve:", err)
 	os.Exit(1)
+}
+
+// pl renders a count with a singular/plural noun: pl(1,"file","files") → "1 file".
+func pl(n int, one, many string) string {
+	if n == 1 {
+		return "1 " + one
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }
