@@ -24,16 +24,16 @@ usage:
 serve flags:
   --dir string          directory of .md files (default ".", the current dir)
   --addr string         listen address; falls back to a free port if taken (default "127.0.0.1:8080")
-  --default-doc string  doc opened at / (default "README.md")
+  --default-doc string  doc opened first (default "README.md")
   --open                open the default browser at the served URL
-  --no-cdn              don't reference CDN assets (mermaid / highlight.js)
-  --no-reload           disable live-reload-on-save
+  --no-reload           disable live-reload polling
+  --no-cdn              deprecated: vendor assets are always embedded (no-op)
 
 build flags:
   --dir string          directory of .md files (default ".", the current dir)
   --out string          output directory (required)
-  --default-doc string  index doc linked at / (default "README.md")
-  --no-cdn              don't reference CDN assets
+  --default-doc string  index doc (default "README.md")
+  --no-cdn              deprecated: vendor assets are always embedded (no-op)
 `
 
 // version is overridable via -ldflags -X main.version=...
@@ -84,11 +84,12 @@ func runServe(args []string) {
 	addr := fs.String("addr", defaultAddr, "listen address (free-port fallback if taken)")
 	defDoc := fs.String("default-doc", "README.md", "doc opened at /")
 	open := fs.Bool("open", false, "open the browser")
-	noCDN := fs.Bool("no-cdn", false, "no CDN assets")
-	noReload := fs.Bool("no-reload", false, "disable live-reload")
+	noReload := fs.Bool("no-reload", false, "disable live-reload polling")
+	noCDN := fs.Bool("no-cdn", false, "deprecated: vendor assets are always embedded (no-op)")
 	_ = fs.Parse(args)
+	_ = noCDN
 
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, NoCDN: *noCDN, LiveReload: !*noReload})
+	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload})
 	if err != nil {
 		fatal(err)
 	}
@@ -97,9 +98,6 @@ func runServe(args []string) {
 		fatal(err)
 	}
 	url := "http://" + shown + "/"
-	if srv.opts.LiveReload {
-		srv.startWatch()
-	}
 	fmt.Println(banner)
 	fmt.Printf("  %s\n\n", version)
 	fmt.Printf("mdserve: serving %s on %s\n", *dir, url)
@@ -117,12 +115,13 @@ func runBuild(args []string) {
 	dir := fs.String("dir", defaultDir, "directory of .md files")
 	out := fs.String("out", "", "output directory (required)")
 	defDoc := fs.String("default-doc", "README.md", "index doc")
-	noCDN := fs.Bool("no-cdn", false, "no CDN assets")
+	noCDN := fs.Bool("no-cdn", false, "deprecated: vendor assets are always embedded (no-op)")
 	_ = fs.Parse(args)
+	_ = noCDN
 	if *out == "" {
 		fatal(fmt.Errorf("build requires --out"))
 	}
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, NoCDN: *noCDN})
+	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc})
 	if err != nil {
 		fatal(err)
 	}

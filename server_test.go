@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -33,129 +34,184 @@ func mustWrite(t *testing.T, p, body string) {
 	}
 }
 
+func get(t *testing.T, srv *Server, target string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
+	return rec
+}
+
 func TestNewServer_RejectsNonDir(t *testing.T) {
 	if _, err := NewServer(Options{Dir: filepath.Join(t.TempDir(), "nope")}); err == nil {
 		t.Fatal("expected error for missing dir")
 	}
 }
 
-func TestRootRedirectsToDefaultDoc(t *testing.T) {
+// TestServesReaderShell asserts "/" returns the ported single-page reader with
+// the three required adaptations: an mdserve brand header, Google Material
+// Symbols (the 0 -960 960 960 viewBox), and no bookmark/reading-marker.
+func TestServesReaderShell(t *testing.T) {
 	srv, _ := newTestServer(t)
-	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rec.Code != http.StatusFound {
-		t.Fatalf("status = %d, want 302", rec.Code)
-	}
-	if loc := rec.Header().Get("Location"); loc != "/docs/README.md" {
-		t.Fatalf("Location = %q, want /docs/README.md", loc)
-	}
-}
-
-func TestRendersMarkdown(t *testing.T) {
-	srv, _ := newTestServer(t)
-	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/guide/intro.md", nil))
+	rec := get(t, srv, "/")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "<h1") || !strings.Contains(body, "Intro") {
-		t.Errorf("missing rendered heading:\n%s", body)
+	for _, want := range []string{
+		"<title>mdserve</title>",
+		`id="brand"`, `class="name">mdserve</span>`, // brand logo + title above the filter
+		`viewBox="0 -960 960 960"`,                       // Google Material Symbols
+		"/vendor/marked.min.js", "/vendor/katex.min.css", // embedded vendor bundle (offline)
+		`id="filter"`, `id="b-theme"`, `id="b-out"`, `id="find-in"`, // filter, theme, outline, find
+		"window.MDSERVE",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("reader shell missing %q", want)
+		}
 	}
-	if !strings.Contains(body, "<table>") {
-		t.Errorf("table extension not rendered")
+	for _, gone := range []string{"readmark", "bookmark", "/api/state"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("reader shell still references removed feature %q", gone)
+		}
 	}
 }
 
-func TestPathTraversalBlocked(t *testing.T) {
-	srv, _ := newTestServer(t)
-	rec := httptest.NewRecorder()
-	// %2e%2e escapes are normalized by net/http; assert an out-of-root path is not 200.
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/../../../etc/passwd.md", nil))
-	if rec.Code == http.StatusOK {
-		t.Fatalf("traversal returned 200: %s", rec.Body.String())
-	}
-}
-
-func TestLiveReloadInjectedOnlyWhenEnabled(t *testing.T) {
+// TestReloadAndDefaultSentinels checks the per-server substitutions.
+func TestReloadAndDefaultSentinels(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "README.md"), "# H\n")
-	on, _ := NewServer(Options{Dir: dir, LiveReload: true})
-	off, _ := NewServer(Options{Dir: dir, LiveReload: false})
-	if !strings.Contains(render(on), "/__mdserve_reload") {
-		t.Error("live-reload script missing when enabled")
+	on, _ := NewServer(Options{Dir: dir, DefaultDoc: "guide/x.md", Reload: true})
+	off, _ := NewServer(Options{Dir: dir, Reload: false})
+	if !strings.Contains(on.page, "reload:true") {
+		t.Error("reload:true not injected when Reload is on")
 	}
-	if strings.Contains(render(off), "/__mdserve_reload") {
-		t.Error("live-reload script present when disabled")
+	if !strings.Contains(on.page, `defaultDoc:"guide/x.md"`) {
+		t.Error("default doc not injected")
+	}
+	if !strings.Contains(off.page, "reload:false") {
+		t.Error("reload:false not injected when Reload is off")
+	}
+	if strings.Contains(on.page, "__RELOAD__") || strings.Contains(on.page, "__DEFAULT__") {
+		t.Error("sentinels left unsubstituted")
 	}
 }
 
-func render(s *Server) string {
-	rec := httptest.NewRecorder()
-	s.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/README.md", nil))
-	return rec.Body.String()
+// TestAPITree decodes /api/tree and checks the directories-first nesting.
+func TestAPITree(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv, "/api/tree")
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+		t.Fatalf("content-type = %q, want json", ct)
+	}
+	var resp struct {
+		Root string    `json:"root"`
+		Tree []apiNode `json:"tree"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Tree) != 2 {
+		t.Fatalf("top-level nodes = %d, want 2", len(resp.Tree))
+	}
+	if resp.Tree[0].Type != "dir" || resp.Tree[0].Name != "guide" {
+		t.Fatalf("first node = %+v, want dir guide", resp.Tree[0])
+	}
+	if len(resp.Tree[0].Children) != 1 || resp.Tree[0].Children[0].Relpath != "guide/intro.md" {
+		t.Fatalf("guide children = %+v, want guide/intro.md", resp.Tree[0].Children)
+	}
+	if resp.Tree[1].Type != "file" || resp.Tree[1].Relpath != "README.md" {
+		t.Fatalf("second node = %+v, want README.md leaf", resp.Tree[1])
+	}
 }
 
-func TestBuildStatic(t *testing.T) {
+func TestRawServesMarkdown(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv, "/raw?path=guide/intro.md")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/markdown") {
+		t.Fatalf("content-type = %q, want markdown", ct)
+	}
+	if !strings.Contains(rec.Body.String(), "# Intro") {
+		t.Errorf("raw markdown missing heading:\n%s", rec.Body.String())
+	}
+}
+
+func TestRawPathTraversalBlocked(t *testing.T) {
+	srv, _ := newTestServer(t)
+	for _, bad := range []string{"../../etc/passwd.md", "/etc/passwd.md", "guide/intro.txt", "guide"} {
+		rec := get(t, srv, "/raw?path="+bad)
+		if rec.Code == http.StatusOK {
+			t.Errorf("path %q returned 200, want non-200", bad)
+		}
+	}
+}
+
+func TestAPIPoll(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv, "/api/poll")
+	var m map[string]float64
+	if err := json.Unmarshal(rec.Body.Bytes(), &m); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := m["README.md"]; !ok {
+		t.Errorf("poll map missing README.md: %v", m)
+	}
+	if _, ok := m["guide/intro.md"]; !ok {
+		t.Errorf("poll map missing guide/intro.md: %v", m)
+	}
+}
+
+func TestVendorAssetServed(t *testing.T) {
+	srv, _ := newTestServer(t)
+	rec := get(t, srv, "/vendor/marked.min.js")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/javascript") {
+		t.Fatalf("content-type = %q, want javascript", ct)
+	}
+	if get(t, srv, "/vendor/does-not-exist.js").Code != http.StatusNotFound {
+		t.Error("unknown vendor asset should 404")
+	}
+	if get(t, srv, "/vendor/fonts/KaTeX_Main-Regular.woff2").Code != http.StatusOK {
+		t.Error("embedded KaTeX font should be served")
+	}
+}
+
+// TestBuildStaticOffline renders the static site and checks each doc is a
+// standalone page that references the copied vendor bundle at the right depth.
+func TestBuildStaticOffline(t *testing.T) {
 	srv, _ := newTestServer(t)
 	out := t.TempDir()
 	if err := srv.BuildStatic(out); err != nil {
 		t.Fatalf("BuildStatic: %v", err)
 	}
-	for _, rel := range []string{"README.md.html", filepath.Join("guide", "intro.md.html")} {
+	for _, rel := range []string{"README.md.html", filepath.Join("guide", "intro.md.html"), filepath.Join("vendor", "marked.min.js")} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Errorf("expected %s: %v", rel, err)
 		}
 	}
-}
-
-func TestBuildTreeNestsAndOrders(t *testing.T) {
-	srv, _ := newTestServer(t)
-	tree, err := srv.buildTree()
+	root, err := os.ReadFile(filepath.Join(out, "README.md.html"))
 	if err != nil {
-		t.Fatalf("buildTree: %v", err)
+		t.Fatal(err)
 	}
-	// Directories sort before files: guide/ then README.md.
-	if len(tree) != 2 {
-		t.Fatalf("top-level nodes = %d, want 2", len(tree))
+	if !strings.Contains(string(root), "<h1") || !strings.Contains(string(root), "Home") {
+		t.Errorf("README.md.html missing rendered heading")
 	}
-	if !tree[0].IsDir || tree[0].Name != "guide" || tree[0].Rel != "guide" {
-		t.Fatalf("first node = %+v, want dir guide", tree[0])
+	if !strings.Contains(string(root), `href="vendor/hljs-theme.css"`) {
+		t.Errorf("root page should reference vendor at depth 0")
 	}
-	if len(tree[0].Children) != 1 || tree[0].Children[0].URL != "/docs/guide/intro.md" {
-		t.Fatalf("guide children = %+v, want one intro.md leaf", tree[0].Children)
+	nested, err := os.ReadFile(filepath.Join(out, "guide", "intro.md.html"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if tree[1].IsDir || tree[1].URL != "/docs/README.md" {
-		t.Fatalf("second node = %+v, want README.md leaf", tree[1])
+	if !strings.Contains(string(nested), "<table>") {
+		t.Errorf("intro.md.html missing rendered table")
 	}
-}
-
-func TestPageHasViewerControls(t *testing.T) {
-	srv, _ := newTestServer(t)
-	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/docs/guide/intro.md", nil))
-	body := rec.Body.String()
-	for _, want := range []string{
-		`class="brand"`, `mdserve</a>`, // program logo + name in the menubar
-		`id="theme"`,                                                    // single theme cycle toggle
-		`id="zoomin"`, `id="zoomout"`, `id="zoomval"`, `id="zoomreset"`, // zoom steppers, level input, reset
-		`id="find"`, `#i-search`, // in-doc search + magnifier
-		`id="q"`, `#i-filter`, // file filter + funnel
-		`id="toggle"`, `id="resize"`, `id="top"`, // sidebar collapse, resize, back-to-top
-		`#i-folder`, `#i-folder-open`, `#i-file`, // tree icons
-		`rel="icon"`,                // favicon
-		`data-doc="guide/intro.md"`, // per-doc scroll-memory key
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("rendered page missing %q", want)
-		}
-	}
-	// The branch leading to the active doc auto-opens, and its leaf is marked.
-	if !strings.Contains(body, "<details open>") {
-		t.Error("active doc's directory was not auto-opened")
-	}
-	if !strings.Contains(body, `data-n="guide/intro.md" class="active"`) {
-		t.Error("active doc leaf not marked active")
+	if !strings.Contains(string(nested), `href="../vendor/hljs-theme.css"`) {
+		t.Errorf("nested page should reference vendor at depth 1 (../)")
 	}
 }
 
@@ -171,8 +227,7 @@ func TestDefaultAddrIsLoopback(t *testing.T) {
 	// The default listen addr must be a concrete loopback addr, never a wildcard
 	// (":8080"). A wildcard bind SUCCEEDS even when another process already holds
 	// 127.0.0.1:<port>, so the free-port fallback never fires — yet the advertised
-	// http://127.0.0.1:<port>/ URL is then served by that other process (observed
-	// in the wild: a local proxy on :8080 answering 400 to every request). Binding
+	// http://127.0.0.1:<port>/ URL is then served by that other process. Binding
 	// loopback makes net.Listen fail with EADDRINUSE so listen() falls back to a
 	// genuinely free port.
 	host, _, err := net.SplitHostPort(defaultAddr)

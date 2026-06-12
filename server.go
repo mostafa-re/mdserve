@@ -2,62 +2,37 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
-	"html/template"
-	"io/fs"
+	"io"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gomarkdown/markdown"
-	"github.com/gomarkdown/markdown/html"
+	gohtml "github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 )
-
-// urlPrefix is the path under which docs are mounted (so a file rel path maps to
-// a stable /docs/<rel> URL).
-const urlPrefix = "/docs/"
-
-// liveReloadPath is the SSE endpoint the browser subscribes to for reload pings.
-const liveReloadPath = "/__mdserve_reload"
 
 // Options configures a Server.
 type Options struct {
 	Dir        string // directory of .md files
-	DefaultDoc string // rel path served at "/" (e.g. "README.md")
-	NoCDN      bool   // when true, omit mermaid/highlight.js CDN assets
-	LiveReload bool   // when true (serve only), inject the live-reload client
+	DefaultDoc string // rel path opened first when none is in the URL hash / history
+	Reload     bool   // when true (serve), the page polls /api/poll for live-reload
 }
 
-// Server walks the docs dir lazily and serves rendered Markdown over HTTP. Each
-// request re-reads the file (no cache) so the page reflects the last save.
+// Server serves the single-page Markdown reader and its data endpoints. Markdown
+// is rendered in the browser (marked.js) from /raw; the file tree comes from
+// /api/tree; change detection from /api/poll; vendor assets from /vendor/. No
+// file is cached server-side — each request re-reads from disk.
 type Server struct {
 	docDir string
-	tmpl   *template.Template
 	opts   Options
-
-	mu      sync.Mutex
-	clients map[chan struct{}]struct{} // live-reload subscribers
-}
-
-// tmplFuncs are the template helpers the page shell needs: hasPrefix (open the
-// dir on the active doc's path) and dict (pass multiple values into the
-// recursive "tree" sub-template).
-var tmplFuncs = template.FuncMap{
-	"hasPrefix": strings.HasPrefix,
-	"dict": func(pairs ...any) map[string]any {
-		m := make(map[string]any, len(pairs)/2)
-		for i := 0; i+1 < len(pairs); i += 2 {
-			key, _ := pairs[i].(string)
-			m[key] = pairs[i+1]
-		}
-		return m
-	},
+	page   string // pageHTML with the per-server sentinels substituted
 }
 
 // NewServer constructs a Server rooted at opts.Dir.
@@ -74,81 +49,157 @@ func NewServer(opts Options) (*Server, error) {
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", abs)
 	}
-	tmpl, err := template.New("page").Funcs(tmplFuncs).Parse(pageTmpl)
-	if err != nil {
-		return nil, fmt.Errorf("parse template: %w", err)
+	reload := "false"
+	if opts.Reload {
+		reload = "true"
 	}
-	return &Server{docDir: abs, tmpl: tmpl, opts: opts, clients: map[chan struct{}]struct{}{}}, nil
+	page := strings.NewReplacer(
+		"__RELOAD__", reload,
+		"__DEFAULT__", opts.DefaultDoc,
+	).Replace(pageHTML)
+	return &Server{docDir: abs, opts: opts, page: page}, nil
 }
 
-// ServeHTTP implements http.Handler:
+// ServeHTTP routes:
 //
-//	GET /                    → 302 to /docs/<DefaultDoc>
-//	GET /docs/<rel>.md       → render that file as HTML
-//	GET /__mdserve_reload    → SSE stream (live-reload)
-//	anything else            → 404
-//
-// Path traversal is blocked by keeping the resolved path within docDir.
+//	GET /                 → the reader shell (HTML)
+//	GET /api/tree         → JSON folder tree {root, rootPath, tree:[...]}
+//	GET /api/poll         → JSON {relpath: mtime} for live-reload
+//	GET /raw?path=<rel>   → raw Markdown bytes (path-safe, .md only)
+//	GET /vendor/<name>    → embedded vendor asset
+//	anything else         → 404
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case r.URL.Path == "/":
-		http.Redirect(w, r, urlPrefix+s.opts.DefaultDoc, http.StatusFound)
-		return
-	case r.URL.Path == liveReloadPath:
-		s.serveLiveReload(w, r)
-		return
-	case !strings.HasPrefix(r.URL.Path, urlPrefix):
+	switch p := r.URL.Path; {
+	case p == "/" || p == "/index.html":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, s.page)
+	case p == "/api/tree":
+		writeJSON(w, map[string]any{
+			"root":     filepath.Base(s.docDir),
+			"rootPath": s.docDir,
+			"tree":     buildAPITree(s.docDir, ""),
+		})
+	case p == "/api/poll":
+		writeJSON(w, s.flattenMtimes())
+	case p == "/raw":
+		s.serveRaw(w, r)
+	case strings.HasPrefix(p, "/vendor/"):
+		serveVendor(w, r, strings.TrimPrefix(p, "/vendor/"))
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// serveRaw returns the raw Markdown for ?path=<rel>, resolved safely inside
+// docDir.
+func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request) {
+	full, ok := s.resolveMd(r.URL.Query().Get("path"))
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	rel := strings.TrimPrefix(r.URL.Path, urlPrefix)
-	if !strings.HasSuffix(rel, ".md") {
-		http.NotFound(w, r)
-		return
-	}
-	full := filepath.Join(s.docDir, filepath.FromSlash(rel))
-	if !strings.HasPrefix(full+string(filepath.Separator), s.docDir+string(filepath.Separator)) && full != s.docDir {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	raw, err := os.ReadFile(full)
+	b, err := os.ReadFile(full)
 	if err != nil {
-		if os.IsNotExist(err) {
-			http.NotFound(w, r)
-			return
-		}
 		http.Error(w, "read: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	title := extractTitle(raw)
-	if title == "" {
-		title = filepath.Base(rel)
-	}
-	tree, err := s.buildTree()
-	if err != nil {
-		http.Error(w, "nav: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	data := pageData{
-		Title:      title,
-		Body:       template.HTML(renderMarkdown(raw)), //nolint:gosec // local docs
-		Tree:       tree,
-		Active:     rel,
-		LiveReload: s.opts.LiveReload,
-		CDN:        !s.opts.NoCDN,
-	}
-	if err := s.tmpl.Execute(w, data); err != nil {
-		fmt.Fprintln(os.Stderr, "mdserve: template execute:", err)
-	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(b)
 }
 
-// renderMarkdown converts a Markdown buffer to safe HTML (tables, fenced code,
-// autolinks, footnotes, heading IDs).
+// resolveMd maps a slash rel path to an absolute .md file inside docDir, or
+// returns ok=false. path.Clean on a rooted copy neutralizes "../" traversal,
+// and a prefix check guards against any residual escape.
+func (s *Server) resolveMd(rel string) (string, bool) {
+	clean := filepath.FromSlash(path.Clean("/" + rel))
+	full := filepath.Join(s.docDir, clean)
+	sep := string(filepath.Separator)
+	if full != s.docDir && !strings.HasPrefix(full+sep, s.docDir+sep) {
+		return "", false
+	}
+	if !strings.HasSuffix(strings.ToLower(full), ".md") {
+		return "", false
+	}
+	if info, err := os.Stat(full); err != nil || info.IsDir() {
+		return "", false
+	}
+	return full, true
+}
+
+// apiNode is one entry in the /api/tree JSON: a directory (with Children) or a
+// .md leaf (with Mtime). Shapes match the reader's client expectations.
+type apiNode struct {
+	Type     string    `json:"type"`
+	Name     string    `json:"name"`
+	Relpath  string    `json:"relpath"`
+	Mtime    float64   `json:"mtime,omitempty"`
+	Children []apiNode `json:"children,omitempty"`
+}
+
+// buildAPITree builds a recursive .md tree under absDir: directories first
+// (pruned when they contain no markdown), then files, each group sorted
+// case-insensitively. Hidden dirs and the build output (_site) are skipped.
+func buildAPITree(absDir, rel string) []apiNode {
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return []apiNode{}
+	}
+	var dirs, files []os.DirEntry
+	for _, e := range entries {
+		if e.IsDir() {
+			if !strings.HasPrefix(e.Name(), ".") && e.Name() != "_site" {
+				dirs = append(dirs, e)
+			}
+		} else if strings.HasSuffix(strings.ToLower(e.Name()), ".md") {
+			files = append(files, e)
+		}
+	}
+	byNameFold := func(s []os.DirEntry) {
+		sort.Slice(s, func(i, j int) bool {
+			return strings.ToLower(s[i].Name()) < strings.ToLower(s[j].Name())
+		})
+	}
+	byNameFold(dirs)
+	byNameFold(files)
+
+	out := []apiNode{}
+	for _, d := range dirs {
+		childRel := relJoin(rel, d.Name())
+		if ch := buildAPITree(filepath.Join(absDir, d.Name()), childRel); len(ch) > 0 {
+			out = append(out, apiNode{Type: "dir", Name: d.Name(), Relpath: childRel, Children: ch})
+		}
+	}
+	for _, f := range files {
+		var mt float64
+		if info, err := f.Info(); err == nil {
+			mt = float64(info.ModTime().UnixNano()) / 1e9
+		}
+		out = append(out, apiNode{Type: "file", Name: f.Name(), Relpath: relJoin(rel, f.Name()), Mtime: mt})
+	}
+	return out
+}
+
+func relJoin(rel, name string) string {
+	if rel == "" {
+		return name
+	}
+	return rel + "/" + name
+}
+
+// renderMarkdown converts a Markdown buffer to HTML (tables, fenced code,
+// autolinks, footnotes, heading IDs). Used by the static build only — the live
+// server renders Markdown in the browser.
 func renderMarkdown(src []byte) []byte {
 	exts := parser.CommonExtensions | parser.AutoHeadingIDs
 	p := parser.NewWithExtensions(exts)
-	renderer := html.NewRenderer(html.RendererOptions{Flags: html.CommonFlags | html.HrefTargetBlank})
+	renderer := gohtml.NewRenderer(gohtml.RendererOptions{Flags: gohtml.CommonFlags | gohtml.HrefTargetBlank})
 	return markdown.Render(p.Parse(src), renderer)
 }
 
@@ -164,120 +215,26 @@ func extractTitle(src []byte) string {
 	return ""
 }
 
-// treeNode is one entry in the nav folder tree: a directory (with Children) or a
-// leaf .md file (with URL). Rel is the slash path from docDir — for a dir it is
-// the dir path, used to auto-open the branch leading to the active doc.
-type treeNode struct {
-	Name     string
-	Rel      string
-	URL      string
-	IsDir    bool
-	Children []*treeNode
-}
+var htmlEsc = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 
-// buildTree walks the docs dir and assembles a nested folder tree of .md files,
-// directories first then files, alphabetical within each level.
-func (s *Server) buildTree() ([]*treeNode, error) {
-	root := &treeNode{IsDir: true}
-	err := filepath.WalkDir(s.docDir, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") || d.Name() == "_site" {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(d.Name(), ".md") {
-			return nil
-		}
-		rel, err := filepath.Rel(s.docDir, p)
-		if err != nil {
-			return err
-		}
-		insertPath(root, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	sortTree(root)
-	return root.Children, nil
-}
-
-// insertPath threads a file's slash-relative path into the tree, creating
-// intermediate directory nodes as needed.
-func insertPath(root *treeNode, rel string) {
-	segs := strings.Split(rel, "/")
-	cur := root
-	for i, seg := range segs {
-		isFile := i == len(segs)-1
-		var child *treeNode
-		for _, c := range cur.Children {
-			if c.Name == seg && c.IsDir == !isFile {
-				child = c
-				break
-			}
-		}
-		if child == nil {
-			child = &treeNode{Name: seg, IsDir: !isFile, Rel: strings.Join(segs[:i+1], "/")}
-			if isFile {
-				child.URL = urlPrefix + rel
-			}
-			cur.Children = append(cur.Children, child)
-		}
-		cur = child
-	}
-}
-
-// sortTree orders each level: directories before files, alphabetical within.
-func sortTree(n *treeNode) {
-	sort.Slice(n.Children, func(i, j int) bool {
-		a, b := n.Children[i], n.Children[j]
-		if a.IsDir != b.IsDir {
-			return a.IsDir
-		}
-		return a.Name < b.Name
-	})
-	for _, c := range n.Children {
-		if c.IsDir {
-			sortTree(c)
-		}
-	}
-}
-
-type pageData struct {
-	Title      string
-	Body       template.HTML
-	Tree       []*treeNode
-	Active     string
-	LiveReload bool
-	CDN        bool
-}
-
-// BuildStatic walks docDir and writes a fully-rendered HTML tree under outDir
-// (no live-reload script). Used by `mdserve build`.
+// BuildStatic renders each .md under docDir to a standalone HTML page under
+// outDir, and copies the embedded vendor bundle alongside, so the result is a
+// fully-offline static site. Used by `mdserve build`.
 func (s *Server) BuildStatic(outDir string) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
-	tree, err := s.buildTree()
-	if err != nil {
+	if err := copyVendor(outDir); err != nil {
 		return err
 	}
-	return filepath.WalkDir(s.docDir, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
-			return nil
-		}
-		rel, err := filepath.Rel(s.docDir, p)
-		if err != nil {
-			return err
-		}
-		raw, err := os.ReadFile(p)
+	entries := s.flattenMtimes()
+	rels := make([]string, 0, len(entries))
+	for rel := range entries {
+		rels = append(rels, rel)
+	}
+	sort.Strings(rels)
+	for _, rel := range rels {
+		raw, err := os.ReadFile(filepath.Join(s.docDir, filepath.FromSlash(rel)))
 		if err != nil {
 			return err
 		}
@@ -285,28 +242,23 @@ func (s *Server) BuildStatic(outDir string) error {
 		if title == "" {
 			title = path.Base(rel)
 		}
-		outPath := filepath.Join(outDir, rel+".html")
+		depth := strings.Count(rel, "/")
+		root := strings.Repeat("../", depth)
+		body := string(renderMarkdown(raw))
+		shell := strings.NewReplacer("__ROOT__", root, "__TITLE__", htmlEsc.Replace(title)).Replace(buildShell)
+		shell = strings.Replace(shell, "__BODY__", body, 1)
+		outPath := filepath.Join(outDir, filepath.FromSlash(rel)+".html")
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 			return err
 		}
-		f, err := os.Create(outPath)
-		if err != nil {
+		if err := os.WriteFile(outPath, []byte(shell), 0o644); err != nil {
 			return err
 		}
-		defer func() { _ = f.Close() }()
-		data := pageData{
-			Title:  title,
-			Body:   template.HTML(renderMarkdown(raw)), //nolint:gosec // local docs
-			Tree:   tree,
-			Active: filepath.ToSlash(rel),
-			CDN:    !s.opts.NoCDN,
-		}
-		return s.tmpl.Execute(f, data)
-	})
+	}
+	return nil
 }
 
-// statusWriter records the response status code (and preserves http.Flusher so
-// the live-reload SSE stream still flushes) for request logging.
+// statusWriter records the response status code for request logging.
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -324,17 +276,12 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func (w *statusWriter) Flush() {
-	if f, ok := w.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
-}
-
-// logRequests wraps h to print one line per doc view: method, path, status, and
-// latency. The live-reload SSE stream is skipped (it is long-lived and noisy).
+// logRequests wraps h to print one line per request (method, path, status,
+// latency). The high-frequency poll and the static vendor assets are skipped so
+// the log stays a readable record of doc views.
 func logRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == liveReloadPath {
+		if r.URL.Path == "/api/poll" || strings.HasPrefix(r.URL.Path, "/vendor/") {
 			h.ServeHTTP(w, r)
 			return
 		}
