@@ -40,6 +40,7 @@ go get -tool github.com/mostafa-re/mdserve@v0.1.0
 ## Usage
 
 ```sh
+mdserve                                         # serve the current dir at 127.0.0.1:8080
 mdserve serve --dir docs --open                 # serve, free-port, open browser
 mdserve serve --dir docs --addr :9000 --no-cdn  # fixed port, offline-pure
 mdserve build --dir docs --out site             # static HTML tree
@@ -48,7 +49,7 @@ mdserve serve --dir docs --default-doc plan/README.md   # custom landing doc
 
 | flag | default | notes |
 |---|---|---|
-| `--dir` | `docs` | directory of `.md` files |
+| `--dir` | `.` | directory of `.md` files (defaults to the current dir) |
 | `--addr` | `127.0.0.1:8080` | loopback only; falls back to a free port if taken |
 | `--default-doc` | `README.md` | doc opened at `/` |
 | `--open` | off | open the browser |

@@ -159,6 +159,14 @@ func TestPageHasViewerControls(t *testing.T) {
 	}
 }
 
+func TestDefaultDirIsWorkingDir(t *testing.T) {
+	// With no --dir, a bare `mdserve` serves the current working directory, not a
+	// hardcoded "docs" subdir — so `cd any-repo && mdserve` just works.
+	if defaultDir != "." {
+		t.Fatalf("defaultDir = %q, want %q so a bare `mdserve` serves the cwd", defaultDir, ".")
+	}
+}
+
 func TestDefaultAddrIsLoopback(t *testing.T) {
 	// The default listen addr must be a concrete loopback addr, never a wildcard
 	// (":8080"). A wildcard bind SUCCEEDS even when another process already holds

@@ -22,7 +22,7 @@ usage:
   mdserve version
 
 serve flags:
-  --dir string          directory of .md files (default "docs")
+  --dir string          directory of .md files (default ".", the current dir)
   --addr string         listen address; falls back to a free port if taken (default "127.0.0.1:8080")
   --default-doc string  doc opened at / (default "README.md")
   --open                open the default browser at the served URL
@@ -30,7 +30,7 @@ serve flags:
   --no-reload           disable live-reload-on-save
 
 build flags:
-  --dir string          directory of .md files (default "docs")
+  --dir string          directory of .md files (default ".", the current dir)
   --out string          output directory (required)
   --default-doc string  index doc linked at / (default "README.md")
   --no-cdn              don't reference CDN assets
@@ -45,6 +45,10 @@ var version = "dev"
 // loopback bind instead fails with EADDRINUSE so listen() falls back to a free
 // port. Loopback also keeps a local docs server off the LAN.
 const defaultAddr = "127.0.0.1:8080"
+
+// defaultDir is the current working directory: a bare `mdserve` (no flags)
+// serves whatever repo you're standing in, instead of assuming a ./docs subdir.
+const defaultDir = "."
 
 // banner is printed once at serve start.
 const banner = `
@@ -76,7 +80,7 @@ func main() {
 
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
-	dir := fs.String("dir", "docs", "directory of .md files")
+	dir := fs.String("dir", defaultDir, "directory of .md files")
 	addr := fs.String("addr", defaultAddr, "listen address (free-port fallback if taken)")
 	defDoc := fs.String("default-doc", "README.md", "doc opened at /")
 	open := fs.Bool("open", false, "open the browser")
@@ -110,7 +114,7 @@ func runServe(args []string) {
 
 func runBuild(args []string) {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
-	dir := fs.String("dir", "docs", "directory of .md files")
+	dir := fs.String("dir", defaultDir, "directory of .md files")
 	out := fs.String("out", "", "output directory (required)")
 	defDoc := fs.String("default-doc", "README.md", "index doc")
 	noCDN := fs.Bool("no-cdn", false, "no CDN assets")
