@@ -63,7 +63,7 @@ func TestServesReaderShell(t *testing.T) {
 		`viewBox="0 -960 960 960"`, `<path d="'+p+'"`, // Material Symbols; MS() wraps path data (guards blank-icon regression)
 		"/vendor/marked.min.js", "/vendor/katex.min.css", // embedded vendor bundle (offline)
 		`id="filter"`, `id="b-theme"`, `id="b-font"`, `id="b-full"`, `id="b-out"`, `id="find-in"`, // controls incl. font + fullscreen
-		`--sel-strong`, `--logo`, `data-theme="dark"`, `data-font="serif"`, // accents; themed logo; dark + serif defaults
+		`--sel-strong`, `--logo`, `data-theme="dark"`, `data-font="sans"`, // accents; themed logo; dark + sans defaults
 		"window.MDSERVE",
 	} {
 		if !strings.Contains(body, want) {

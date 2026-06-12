@@ -274,7 +274,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 }
 </style>
 </head>
-<body data-theme="dark" data-font="serif">
+<body data-theme="dark" data-font="sans">
 
 <aside id="sidebar">
   <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="ver">__VERSION__</span><span class="cwd" id="rootname"></span></div>
@@ -796,7 +796,7 @@ $("#b-theme").onclick = ()=>{
 const FONTS = ["serif","sans"];
 function setFont(f){
   document.body.dataset.font = f; localStorage.setItem("mdr-font", f);
-  const b=$("#b-font"); if(b) b.title="Reading font: "+f+" (click to switch)";
+  const b=$("#b-font"); if(b){ b.classList.toggle("on", f==="serif"); b.title="Reading font: "+f+" — click for "+(f==="serif"?"sans":"serif"); }
 }
 $("#b-font").onclick = ()=>{ const i=FONTS.indexOf(document.body.dataset.font||"serif"); setFont(FONTS[(i+1)%FONTS.length]); };
 // fullscreen toggle (icon swaps enter/exit)
@@ -891,7 +891,7 @@ async function poll(){
 /* ---------- boot ---------- */
 (function init(){
   setTheme(localStorage.getItem("mdr-theme") || "dark");
-  setFont(localStorage.getItem("mdr-font") || "serif");
+  setFont(localStorage.getItem("mdr-font") || "sans");
   updFull();
   if(localStorage.getItem("mdr-side")==="1") $("#sidebar").classList.add("collapsed");
   if(localStorage.getItem("mdr-out")==="1")  $("#outline").classList.add("collapsed");
