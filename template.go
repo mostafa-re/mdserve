@@ -251,11 +251,23 @@ mark.find{background:#ffe08a;color:#000;border-radius:2px;padding:0 1px}
 mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 
 @media print{
-  #sidebar,#outline,#toolbar,#progress{display:none!important}
+  /* chrome and overlays off */
+  #sidebar,#outline,#toolbar,#progress,#findbar,#fab-up{display:none!important}
+  html,body{height:auto!important;overflow:visible!important}
   body{display:block;background:#fff}
-  #viewport{overflow:visible}
+  #main{overflow:visible!important}
+  #viewport{position:static!important;overflow:visible!important}
   #canvas{width:auto!important;height:auto!important;margin:0!important}
-  #page{box-shadow:none;border:none;transform:none!important;width:auto;padding:0}
+  /* the live page carries an inline pixel width + transform from zoom/layout;
+     override both so content reflows to the paper instead of running off it */
+  #page{box-shadow:none!important;border:none!important;transform:none!important;
+    width:auto!important;max-width:100%!important;padding:0!important}
+  /* wrap long code / cells that otherwise overflow the page width */
+  #page pre,#page pre code{white-space:pre-wrap!important;word-break:break-word!important;overflow:visible!important}
+  #page code{word-break:break-word!important}
+  #page .table-wrap{overflow:visible!important}
+  #page th,#page td{word-break:break-word!important}
+  #page img{max-width:100%!important}
 }
 </style>
 </head>
@@ -289,7 +301,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
     <button class="tbtn" id="b-theme" title="Cycle theme (warm / light / dark)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg></button>
     <button class="tbtn" id="b-font" title="Reading font (serif / sans)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M340-160q-25 0-42.5-17.5T280-220v-460H140q-25 0-42.5-17.5T80-740q0-25 17.5-42.5T140-800h400q25 0 42.5 17.5T600-740q0 25-17.5 42.5T540-680H400v460q0 25-17.5 42.5T340-160Zm360 0q-25 0-42.5-17.5T640-220v-260h-60q-25 0-42.5-17.5T520-540q0-25 17.5-42.5T580-600h240q25 0 42.5 17.5T880-540q0 25-17.5 42.5T820-480h-60v260q0 25-17.5 42.5T700-160Z"/></svg></button>
     <button class="tbtn" id="b-full" title="Full screen"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M200-200h80q17 0 28.5 11.5T320-160q0 17-11.5 28.5T280-120H160q-17 0-28.5-11.5T120-160v-120q0-17 11.5-28.5T160-320q17 0 28.5 11.5T200-280v80Zm560 0v-80q0-17 11.5-28.5T800-320q17 0 28.5 11.5T840-280v120q0 17-11.5 28.5T800-120H680q-17 0-28.5-11.5T640-160q0-17 11.5-28.5T680-200h80ZM200-760v80q0 17-11.5 28.5T160-640q-17 0-28.5-11.5T120-680v-120q0-17 11.5-28.5T160-840h120q17 0 28.5 11.5T320-800q0 17-11.5 28.5T280-760h-80Zm560 0h-80q-17 0-28.5-11.5T640-800q0-17 11.5-28.5T680-840h120q17 0 28.5 11.5T840-800v120q0 17-11.5 28.5T800-640q-17 0-28.5-11.5T760-680v-80Z"/></svg></button>
-    <button class="tbtn" id="b-print" title="Print / save as PDF"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320ZM160-360h80q0-33 23.5-56.5T320-440h320q33 0 56.5 23.5T720-360h80v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160Zm480-280v-120H320v120h-80v-120q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v120h-80Zm80 180q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320ZM160-560h640-640Z"/></svg></button>
+    <button class="tbtn" id="b-print" title="Print / save as PDF"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320Zm400-560H240v-80q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v80Zm0 220q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460ZM320-200h320v-160H320v160Z"/></svg></button>
     <button class="tbtn" id="b-find" title="Find in page (Cmd/Ctrl F)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg></button>
     <div id="crumb"></div>
     <button class="tbtn" id="b-out" title="Toggle outline (Cmd/Ctrl \\)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M160-280q-17 0-28.5-11.5T120-320q0-17 11.5-28.5T160-360h480q17 0 28.5 11.5T680-320q0 17-11.5 28.5T640-280H160Zm0-160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520h480q17 0 28.5 11.5T680-480q0 17-11.5 28.5T640-440H160Zm0-160q-17 0-28.5-11.5T120-640q0-17 11.5-28.5T160-680h480q17 0 28.5 11.5T680-640q0 17-11.5 28.5T640-600H160Zm640 320q-17 0-28.5-11.5T760-320q0-17 11.5-28.5T800-360q17 0 28.5 11.5T840-320q0 17-11.5 28.5T800-280Zm0-160q-17 0-28.5-11.5T760-480q0-17 11.5-28.5T800-520q17 0 28.5 11.5T840-480q0 17-11.5 28.5T800-440Zm0-160q-17 0-28.5-11.5T760-640q0-17 11.5-28.5T800-680q17 0 28.5 11.5T840-640q0 17-11.5 28.5T800-600Z"/></svg></button>
