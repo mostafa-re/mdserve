@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -271,6 +272,9 @@ func (s *Server) BuildStatic(outDir string) error {
 	if err := copyVendor(outDir); err != nil {
 		return err
 	}
+	if err := s.copyAssets(outDir); err != nil {
+		return err
+	}
 	entries := s.flattenMtimes()
 	rels := make([]string, 0, len(entries))
 	for rel := range entries {
@@ -300,6 +304,54 @@ func (s *Server) BuildStatic(outDir string) error {
 		}
 	}
 	return nil
+}
+
+// copyAssets mirrors every non-Markdown file under docDir into outDir (same
+// relative paths), so images and other assets referenced by the docs resolve in
+// the static site. Hidden dirs and the build output (_site) are skipped.
+func (s *Server) copyAssets(outDir string) error {
+	return filepath.WalkDir(s.docDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") || d.Name() == "_site" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
+			return nil
+		}
+		rel, err := filepath.Rel(s.docDir, p)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(outDir, rel)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return copyFile(p, dst)
+	})
+}
+
+func copyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	_, err = io.Copy(out, in)
+	return err
 }
 
 // statusWriter records the response status code for request logging.

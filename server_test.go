@@ -228,12 +228,13 @@ func TestVendorAssetServed(t *testing.T) {
 // TestBuildStaticOffline renders the static site and checks each doc is a
 // standalone page that references the copied vendor bundle at the right depth.
 func TestBuildStaticOffline(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, dir := newTestServer(t)
+	mustWrite(t, filepath.Join(dir, "img", "pic.png"), "\x89PNG\r\n\x1a\nfake")
 	out := t.TempDir()
 	if err := srv.BuildStatic(out); err != nil {
 		t.Fatalf("BuildStatic: %v", err)
 	}
-	for _, rel := range []string{"README.md.html", filepath.Join("guide", "intro.md.html"), filepath.Join("vendor", "marked.min.js")} {
+	for _, rel := range []string{"README.md.html", filepath.Join("guide", "intro.md.html"), filepath.Join("vendor", "marked.min.js"), filepath.Join("img", "pic.png")} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Errorf("expected %s: %v", rel, err)
 		}
