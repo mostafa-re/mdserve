@@ -40,10 +40,10 @@ const pageHTML = `<!doctype html>
   --shadow:0 1px 2px rgba(40,50,70,.05),0 8px 26px rgba(40,50,70,.07); --hljs-filter:none;
 }
 [data-theme="dark"]{
-  --app-bg:#16181c; --rail-bg:#1c1f25; --paper:#22262d; --ink:#dde2e9;
-  --muted:#98a1ad; --faint:#5f6a77; --accent:#a7b0bd; --accent-soft:#3a414c;
-  --active:#2a2f37; --border:#2b313a; --code-bg:#191c22; --code-ink:#c6cfdb; --sel:#333b46; --sel-strong:#2f81f7; --logo:#2f81f7;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.45); --hljs-filter:invert(.92) hue-rotate(180deg);
+  --app-bg:#010409; --rail-bg:#0d1117; --paper:#0d1117; --ink:#e6edf3;
+  --muted:#8b949e; --faint:#6e7681; --accent:#2f81f7; --accent-soft:#2b466b;
+  --active:#21262d; --border:#30363d; --code-bg:#161b22; --code-ink:#c9d1d9; --sel:#26354d; --sel-strong:#2f81f7; --logo:#2f81f7;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.5); --hljs-filter:invert(.92) hue-rotate(180deg);
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
