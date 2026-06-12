@@ -156,7 +156,8 @@ func runServe(args []string) {
 	fmt.Printf("  %s\n", versionString())
 	fmt.Printf("  %s\n", srv.docDir)
 	fmt.Printf("  %s · %s\n\n", pl(files, "markdown file", "markdown files"), pl(dirs, "directory", "directories"))
-	fmt.Printf("  ➜  %s\n\n", url)
+	fmt.Printf("  ➜  %s\n", url)
+	fmt.Printf("  %s\n\n", paint("90", "Ctrl+C to stop"))
 	if *open {
 		openBrowser(url)
 	}
