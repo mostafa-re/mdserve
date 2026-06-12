@@ -59,10 +59,11 @@ func TestServesReaderShell(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"<title>mdserve</title>",
-		`id="brand"`, `class="name">mdserve</span>`, // brand logo + title above the filter
-		`viewBox="0 -960 960 960"`,                       // Google Material Symbols
+		`id="brand"`, `class="name">mdserve</span>`, `class="cwd" id="rootname"`, // logo + title + cwd, above the filter
+		`viewBox="0 -960 960 960"`, `<path d="'+p+'"`, // Material Symbols; MS() wraps path data (guards blank-icon regression)
 		"/vendor/marked.min.js", "/vendor/katex.min.css", // embedded vendor bundle (offline)
-		`id="filter"`, `id="b-theme"`, `id="b-out"`, `id="find-in"`, // filter, theme, outline, find
+		`id="filter"`, `id="b-theme"`, `id="b-font"`, `id="b-full"`, `id="b-out"`, `id="find-in"`, // controls incl. font + fullscreen
+		`--sel-strong`, `data-font="serif"`, // bolder selection accent; default reading font
 		"window.MDSERVE",
 	} {
 		if !strings.Contains(body, want) {

@@ -30,19 +30,19 @@ const pageHTML = `<!doctype html>
 [data-theme="warm"]{
   --app-bg:#edece6; --rail-bg:#f5f4ef; --paper:#fbfaf6; --ink:#34352f;
   --muted:#8c8b80; --faint:#b6b4a6; --accent:#8a7f6a; --accent-soft:#cdc8ba;
-  --active:#e8e5db; --border:#e5e2d8; --code-bg:#f1efe8; --code-ink:#56534a; --sel:#e9e4d6;
+  --active:#e8e5db; --border:#e5e2d8; --code-bg:#f1efe8; --code-ink:#56534a; --sel:#e9e4d6; --sel-strong:#b5651d;
   --shadow:0 1px 2px rgba(60,55,40,.05),0 8px 26px rgba(60,55,40,.06); --hljs-filter:none;
 }
 [data-theme="light"]{
   --app-bg:#eceef1; --rail-bg:#f6f7f9; --paper:#ffffff; --ink:#23272e;
   --muted:#6b7480; --faint:#aab1bb; --accent:#5b6570; --accent-soft:#cdd3da;
-  --active:#e7eaef; --border:#e6e9ee; --code-bg:#f4f6f8; --code-ink:#2f363d; --sel:#d7dde6;
+  --active:#e7eaef; --border:#e6e9ee; --code-bg:#f4f6f8; --code-ink:#2f363d; --sel:#d7dde6; --sel-strong:#0969da;
   --shadow:0 1px 2px rgba(40,50,70,.05),0 8px 26px rgba(40,50,70,.07); --hljs-filter:none;
 }
 [data-theme="dark"]{
   --app-bg:#16181c; --rail-bg:#1c1f25; --paper:#22262d; --ink:#dde2e9;
   --muted:#98a1ad; --faint:#5f6a77; --accent:#a7b0bd; --accent-soft:#3a414c;
-  --active:#2a2f37; --border:#2b313a; --code-bg:#191c22; --code-ink:#c6cfdb; --sel:#333b46;
+  --active:#2a2f37; --border:#2b313a; --code-bg:#191c22; --code-ink:#c6cfdb; --sel:#333b46; --sel-strong:#2f81f7;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.45); --hljs-filter:invert(.92) hue-rotate(180deg);
 }
 *{box-sizing:border-box}
@@ -54,6 +54,9 @@ body{
 }
 ::selection{background:var(--sel)}
 svg{fill:currentColor}
+/* reading font, toggled by the toolbar (serif default, sans optional) */
+body[data-font="serif"]{--read-font:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif}
+body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 
 /* ---- left sidebar : brand + filter + file tree ---- */
 #sidebar{
@@ -75,6 +78,9 @@ svg{fill:currentColor}
 }
 #brand .logo{width:22px;height:22px;border-radius:6px;flex:none}
 #brand .name{font-size:15px;letter-spacing:.01em}
+#brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
+#brand .cwd:empty{display:none}
 .rail-top{
   height:var(--bar); flex:none; display:flex; align-items:center; gap:8px;
   padding:0 10px; border-bottom:1px solid var(--border); white-space:nowrap;
@@ -84,11 +90,6 @@ svg{fill:currentColor}
   color:var(--muted); font-weight:700;
 }
 .filter{flex:1;margin:0;position:relative}
-#cwd{margin:10px 8px 8px;padding-bottom:10px;font-weight:600;color:var(--ink);cursor:default;
-  border-bottom:1px solid var(--border);border-radius:0}
-#cwd:hover{background:transparent}
-#cwd .ico{color:var(--accent);opacity:1}
-#cwd .name{overflow:hidden;text-overflow:ellipsis}
 .filter input{width:100%;border:1px solid var(--border);background:var(--paper);color:var(--ink);
   border-radius:8px;padding:7px 26px 7px 30px;font-size:13px;outline:none;transition:border-color .12s}
 .filter input::placeholder{color:var(--faint)}
@@ -110,8 +111,8 @@ svg{fill:currentColor}
 }
 .row:hover{background:rgba(0,0,0,.06)}
 [data-theme="dark"] .row:hover{background:rgba(255,255,255,.06)}
-.row.active{background:var(--active); color:var(--ink)}
-.row.active .ico{opacity:1;color:var(--accent)}
+.row.active,.row.active:hover{background:var(--sel-strong); color:#fff; font-weight:600}
+.row.active .ico{opacity:1;color:#fff}
 .row .ico{width:16px;height:16px;opacity:.75;flex:none;color:var(--muted);display:flex;align-items:center;justify-content:center}
 .row .ico svg{width:16px;height:16px}
 .row .ico .f-open,.row .ico .f-closed{display:flex;align-items:center;justify-content:center}
@@ -159,7 +160,7 @@ svg{fill:currentColor}
 #page{
   width:780px; position:relative; background:transparent; color:var(--ink);
   padding:40px 48px 96px;
-  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  font-family:var(--read-font,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif);
   font-size:16px; line-height:1.68; transform-origin:0 0; will-change:transform;
   overflow-wrap:break-word;
 }
@@ -219,7 +220,7 @@ svg{fill:currentColor}
 [data-theme="dark"] #toc a:hover{background:rgba(255,255,255,.05)}
 #toc a.lvl2{padding-left:22px;font-size:12.5px}
 #toc a.lvl3{padding-left:34px;font-size:12px}
-#toc a.active{color:var(--accent);font-weight:600;background:rgba(0,0,0,.04)}
+#toc a.active{color:var(--sel-strong);font-weight:700;background:rgba(0,0,0,.04)}
 [data-theme="dark"] #toc a.active{background:rgba(255,255,255,.05)}
 
 /* scrollbars */
@@ -258,18 +259,17 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 }
 </style>
 </head>
-<body data-theme="warm">
+<body data-theme="warm" data-font="serif">
 
 <aside id="sidebar">
-  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span></div>
+  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="cwd" id="rootname"></span></div>
   <div class="rail-top">
     <div class="filter">
-      <span class="sicon"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg></span>
+      <span class="sicon"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg></span>
       <input id="filter" type="text" placeholder="Filter files  ( / )" spellcheck="false" autocomplete="off">
       <button class="clr" id="b-clr" title="Clear"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg></button>
     </div>
   </div>
-  <div id="cwd" class="row" title=""><span class="ico"></span><span class="name" id="rootname">Documents</span></div>
   <div id="tree"></div>
   <div class="rail-resize" title="Drag to resize"></div>
 </aside>
@@ -283,10 +283,12 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
     <button class="tbtn" id="b-zin" title="Zoom in (Ctrl +)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M340-540h-40q-17 0-28.5-11.5T260-580q0-17 11.5-28.5T300-620h40v-40q0-17 11.5-28.5T380-700q17 0 28.5 11.5T420-660v40h40q17 0 28.5 11.5T500-580q0 17-11.5 28.5T460-540h-40v40q0 17-11.5 28.5T380-460q-17 0-28.5-11.5T340-500v-40Zm40 220q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg></button>
     <button class="tbtn" id="b-zreset" title="Reset zoom to 100% (Ctrl 0)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M393-132q-103-29-168-113.5T160-440q0-57 19-108.5t54-94.5q11-12 27-12.5t29 12.5q11 11 11.5 27T290-586q-24 31-37 68t-13 78q0 81 47.5 144.5T410-209q13 4 21.5 15t8.5 24q0 20-14 31.5t-33 6.5Zm174 0q-19 5-33-7t-14-32q0-12 8.5-23t21.5-15q75-24 122.5-87T720-440q0-100-70-170t-170-70h-3l16 16q11 11 11 28t-11 28q-11 11-28 11t-28-11l-84-84q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l84-84q11-11 28-11t28 11q11 11 11 28t-11 28l-16 16h3q134 0 227 93t93 227q0 109-65 194T567-132Z"/></svg></button>
     <div class="sep"></div>
-    <button class="tbtn on" id="b-select" title="Select text"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="m320-410 79-110h170L320-716v306Zm286 305q-23 11-46 2.5T526-134L406-392l-93 130q-17 24-45 15t-28-38v-513q0-25 22.5-36t42.5 5l404 318q23 17 13.5 44T684-440H516l119 255q11 23 2.5 46T606-105ZM399-520Z"/></svg></button>
-    <button class="tbtn" id="b-hand" title="Hand tool — drag to pan (H)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M402-40q-30 0-56-13.5T303-92L67-438q-8-12-7-26t12-24q19-19 45-22t47 12l116 81v-383q0-17 11.5-28.5T320-840q17 0 28.5 11.5T360-800v460q0 24-21.5 35.5T297-307l-85-60 157 229q5 8 14 13t19 5h278q33 0 56.5-23.5T760-200v-560q0-17 11.5-28.5T800-800q17 0 28.5 11.5T840-760v560q0 66-47 113T680-40H402Zm78-880q17 0 28.5 11.5T520-880v360q0 17-11.5 28.5T480-480q-17 0-28.5-11.5T440-520v-360q0-17 11.5-28.5T480-920Zm160 40q17 0 28.5 11.5T680-840v320q0 17-11.5 28.5T640-480q-17 0-28.5-11.5T600-520v-320q0-17 11.5-28.5T640-880ZM486-300Z"/></svg></button>
+    <button class="tbtn on" id="b-select" title="Select text"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M606-105q-23 11-46 2.5T526-134L406-392l-93 130q-17 24-45 15t-28-38v-513q0-25 22.5-36t42.5 5l404 318q23 17 13.5 44T684-440H516l119 255q11 23 2.5 46T606-105Z"/></svg></button>
+    <button class="tbtn" id="b-hand" title="Hand tool — drag to pan (H)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M402-40q-30 0-56-13.5T303-92L67-438q-8-12-7-26t12-24q19-19 45-22t47 12l116 81v-383q0-17 11.5-28.5T320-840q17 0 28.5 11.5T360-800v320h80v-400q0-17 11.5-28.5T480-920q17 0 28.5 11.5T520-880v400h80v-360q0-17 11.5-28.5T640-880q17 0 28.5 11.5T680-840v360h80v-280q0-17 11.5-28.5T800-800q17 0 28.5 11.5T840-760v560q0 66-47 113T680-40H402Z"/></svg></button>
     <div class="sep"></div>
     <button class="tbtn" id="b-theme" title="Cycle theme (warm / light / dark)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg></button>
+    <button class="tbtn" id="b-font" title="Reading font (serif / sans)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M340-160q-25 0-42.5-17.5T280-220v-460H140q-25 0-42.5-17.5T80-740q0-25 17.5-42.5T140-800h400q25 0 42.5 17.5T600-740q0 25-17.5 42.5T540-680H400v460q0 25-17.5 42.5T340-160Zm360 0q-25 0-42.5-17.5T640-220v-260h-60q-25 0-42.5-17.5T520-540q0-25 17.5-42.5T580-600h240q25 0 42.5 17.5T880-540q0 25-17.5 42.5T820-480h-60v260q0 25-17.5 42.5T700-160Z"/></svg></button>
+    <button class="tbtn" id="b-full" title="Full screen"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M200-200h80q17 0 28.5 11.5T320-160q0 17-11.5 28.5T280-120H160q-17 0-28.5-11.5T120-160v-120q0-17 11.5-28.5T160-320q17 0 28.5 11.5T200-280v80Zm560 0v-80q0-17 11.5-28.5T800-320q17 0 28.5 11.5T840-280v120q0 17-11.5 28.5T800-120H680q-17 0-28.5-11.5T640-160q0-17 11.5-28.5T680-200h80ZM200-760v80q0 17-11.5 28.5T160-640q-17 0-28.5-11.5T120-680v-120q0-17 11.5-28.5T160-840h120q17 0 28.5 11.5T320-800q0 17-11.5 28.5T280-760h-80Zm560 0h-80q-17 0-28.5-11.5T640-800q0-17 11.5-28.5T680-840h120q17 0 28.5 11.5T840-800v120q0 17-11.5 28.5T800-640q-17 0-28.5-11.5T760-680v-80Z"/></svg></button>
     <button class="tbtn" id="b-print" title="Print / save as PDF"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M320-120q-33 0-56.5-23.5T240-200v-80h-80q-33 0-56.5-23.5T80-360v-160q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v160q0 33-23.5 56.5T800-280h-80v80q0 33-23.5 56.5T640-120H320ZM160-360h80q0-33 23.5-56.5T320-440h320q33 0 56.5 23.5T720-360h80v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160Zm480-280v-120H320v120h-80v-120q0-33 23.5-56.5T320-840h320q33 0 56.5 23.5T720-760v120h-80Zm80 180q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320ZM160-560h640-640Z"/></svg></button>
     <button class="tbtn" id="b-find" title="Find in page (Cmd/Ctrl F)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg></button>
     <div id="crumb"></div>
@@ -326,13 +328,14 @@ let bootTarget = "";
 const THEMES = ["warm","light","dark"];
 const mermaidTheme = t => t==="dark" ? "dark" : (t==="warm" ? "neutral" : "default");
 // Google Material Symbols (Rounded), wrapped as inline svgs that fill currentColor.
-const MS = p => '<svg viewBox="0 -960 960 960" fill="currentColor">'+p+'</svg>';
+const MS = p => '<svg viewBox="0 -960 960 960" fill="currentColor"><path d="'+p+'"/></svg>';
 const PATH = {
   expandMore: 'M480-362q-8 0-15-2.5t-13-8.5L268-557q-11-11-11-28t11-28q11-11 28-11t28 11l156 156 156-156q11-11 28-11t28 11q11 11 11 28t-11 28L508-373q-6 6-13 8.5t-15 2.5Z',
   folder: 'M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h207q16 0 30.5 6t25.5 17l57 57h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80h640v-400H447l-80-80H160v480Zm0 0v-480 480Z',
   folderOpen: 'M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h207q16 0 30.5 6t25.5 17l57 57h360q17 0 28.5 11.5T880-680q0 17-11.5 28.5T840-640H447l-80-80H160v480l79-263q8-26 29.5-41.5T316-560h516q41 0 64.5 32.5T909-457l-72 240q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm-84-262v-218 218Zm84 262 72-240-72 240Z',
   file: 'M360-240h240q17 0 28.5-11.5T640-280q0-17-11.5-28.5T600-320H360q-17 0-28.5 11.5T320-280q0 17 11.5 28.5T360-240Zm0-160h240q17 0 28.5-11.5T640-440q0-17-11.5-28.5T600-480H360q-17 0-28.5 11.5T320-440q0 17 11.5 28.5T360-400ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h287q16 0 30.5 6t25.5 17l194 194q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T720-80H240Zm280-560v-160H240v640h480v-440H560q-17 0-28.5-11.5T520-640ZM240-800v200-200 640-640Z',
-  home: 'M240-200h120v-200q0-17 11.5-28.5T400-440h160q17 0 28.5 11.5T600-400v200h120v-360L480-740 240-560v360Zm-80 0v-360q0-19 8.5-36t23.5-28l240-180q21-16 48-16t48 16l240 180q15 11 23.5 28t8.5 36v360q0 33-23.5 56.5T720-120H560q-17 0-28.5-11.5T520-160v-200h-80v200q0 17-11.5 28.5T400-120H240q-33 0-56.5-23.5T160-200Zm320-270Z',
+  full: 'M200-200h80q17 0 28.5 11.5T320-160q0 17-11.5 28.5T280-120H160q-17 0-28.5-11.5T120-160v-120q0-17 11.5-28.5T160-320q17 0 28.5 11.5T200-280v80Zm560 0v-80q0-17 11.5-28.5T800-320q17 0 28.5 11.5T840-280v120q0 17-11.5 28.5T800-120H680q-17 0-28.5-11.5T640-160q0-17 11.5-28.5T680-200h80ZM200-760v80q0 17-11.5 28.5T160-640q-17 0-28.5-11.5T120-680v-120q0-17 11.5-28.5T160-840h120q17 0 28.5 11.5T320-800q0 17-11.5 28.5T280-760h-80Zm560 0h-80q-17 0-28.5-11.5T640-800q0-17 11.5-28.5T680-840h120q17 0 28.5 11.5T840-800v120q0 17-11.5 28.5T800-640q-17 0-28.5-11.5T760-680v-80Z',
+  fullExit: 'M240-240h-80q-17 0-28.5-11.5T120-280q0-17 11.5-28.5T160-320h120q17 0 28.5 11.5T320-280v120q0 17-11.5 28.5T280-120q-17 0-28.5-11.5T240-160v-80Zm480 0v80q0 17-11.5 28.5T680-120q-17 0-28.5-11.5T640-160v-120q0-17 11.5-28.5T680-320h120q17 0 28.5 11.5T840-280q0 17-11.5 28.5T800-240h-80ZM240-720v-80q0-17 11.5-28.5T280-840q17 0 28.5 11.5T320-800v120q0 17-11.5 28.5T280-640H160q-17 0-28.5-11.5T120-680q0-17 11.5-28.5T160-720h80Zm480 0h80q17 0 28.5 11.5T840-680q0 17-11.5 28.5T800-640H680q-17 0-28.5-11.5T640-680v-120q0-17 11.5-28.5T680-840q17 0 28.5 11.5T720-800v80Z',
   warm: 'M792-670q11 11 11 28t-11 28l-29 29q-12 12-28.5 12T706-585q-12-12-11.5-28.5T707-642l29-29q12-11 28.5-10.5T792-670ZM120-160q-17 0-28.5-11.5T80-200q0-17 11.5-28.5T120-240h720q17 0 28.5 11.5T880-200q0 17-11.5 28.5T840-160H120Zm360-640q17 0 28.5 11.5T520-760v40q0 17-11.5 28.5T480-680q-17 0-28.5-11.5T440-720v-40q0-17 11.5-28.5T480-800ZM170-672q11-11 28-11t28 11l29 29q12 12 12 28.5T255-586q-12 11-29 11t-28-12l-29-29q-11-12-10.5-28.5T170-672Zm127 272h366q-23-54-72-87t-111-33q-62 0-111 33t-72 87Zm-97 80q0-117 81.5-198.5T480-600q117 0 198.5 81.5T760-320H200Zm280-80Z',
   light: 'M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM80-440q-17 0-28.5-11.5T40-480q0-17 11.5-28.5T80-520h80q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440H80Zm720 0q-17 0-28.5-11.5T760-480q0-17 11.5-28.5T800-520h80q17 0 28.5 11.5T920-480q0 17-11.5 28.5T880-440h-80ZM480-760q-17 0-28.5-11.5T440-800v-80q0-17 11.5-28.5T480-920q17 0 28.5 11.5T520-880v80q0 17-11.5 28.5T480-760Zm0 720q-17 0-28.5-11.5T440-80v-80q0-17 11.5-28.5T480-200q17 0 28.5 11.5T520-160v80q0 17-11.5 28.5T480-40ZM226-678l-43-42q-12-11-11.5-28t11.5-29q12-12 29-12t28 12l42 43q11 12 11 28t-11 28q-11 12-27.5 11.5T226-678Zm494 495-42-43q-11-12-11-28.5t11-27.5q11-12 27.5-11.5T734-282l43 42q12 11 11.5 28T777-183q-12 12-29 12t-28-12Zm-42-495q-12-11-11.5-27.5T678-734l42-43q11-12 28-11.5t29 11.5q12 12 12 29t-12 28l-43 42q-12 11-28 11t-28-11ZM183-183q-12-12-12-29t12-28l43-42q12-11 28.5-11t27.5 11q12 11 11.5 27.5T282-226l-42 43q-11 12-28 11.5T183-183Zm297-297Z',
   dark: 'M480-120q-151 0-255.5-104.5T120-480q0-138 90-239.5T440-838q13-2 23 3.5t16 14.5q6 9 6.5 21t-7.5 23q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q11-7 22.5-6.5T819-479q10 5 15.5 15t3.5 24q-14 138-117.5 229T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z'
@@ -342,7 +345,6 @@ const ICONS = {
   folder:  MS(PATH.folder),
   folderOpen: MS(PATH.folderOpen),
   file:    MS(PATH.file),
-  root:    MS(PATH.home),
   theme: { warm: MS(PATH.warm), light: MS(PATH.light), dark: MS(PATH.dark) }
 };
 
@@ -351,9 +353,8 @@ marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
 /* ---------- file tree ---------- */
 async function loadTree(){
   const data = await (await fetch("/api/tree")).json();
-  $("#rootname").textContent = data.root || "Documents";
-  $("#cwd").title = data.rootPath || data.root || "";
-  $("#cwd .ico").innerHTML = ICONS.root;
+  $("#rootname").textContent = data.root || "";
+  $("#rootname").title = data.rootPath || data.root || "";
   const key = JSON.stringify(stripMtime(data.tree));
   if(key === state.treeKey) return data;
   state.treeKey = key;
@@ -770,6 +771,20 @@ $("#find-in").addEventListener("keydown", e=>{
 $("#b-theme").onclick = ()=>{
   const i=THEMES.indexOf(state.theme); setTheme(THEMES[(i+1)%THEMES.length]);
 };
+// reading font — toggle the #page body type between serif (default) and sans
+const FONTS = ["serif","sans"];
+function setFont(f){
+  document.body.dataset.font = f; localStorage.setItem("mdr-font", f);
+  const b=$("#b-font"); if(b) b.title="Reading font: "+f+" (click to switch)";
+}
+$("#b-font").onclick = ()=>{ const i=FONTS.indexOf(document.body.dataset.font||"serif"); setFont(FONTS[(i+1)%FONTS.length]); };
+// fullscreen toggle (icon swaps enter/exit)
+function updFull(){
+  const on=!!document.fullscreenElement, b=$("#b-full");
+  if(b){ b.innerHTML=MS(on?PATH.fullExit:PATH.full); b.classList.toggle("on",on); b.title=on?"Exit full screen":"Full screen"; }
+}
+$("#b-full").onclick = ()=>{ if(document.fullscreenElement) document.exitFullscreen(); else if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); };
+document.addEventListener("fullscreenchange", updFull);
 const filterEl = $("#filter");
 filterEl.addEventListener("input", e=>{
   $(".filter").classList.toggle("has", !!e.target.value);
@@ -847,6 +862,8 @@ async function poll(){
 /* ---------- boot ---------- */
 (function init(){
   setTheme(localStorage.getItem("mdr-theme") || "warm");
+  setFont(localStorage.getItem("mdr-font") || "serif");
+  updFull();
   if(localStorage.getItem("mdr-side")==="1") $("#sidebar").classList.add("collapsed");
   if(localStorage.getItem("mdr-out")==="1")  $("#outline").classList.add("collapsed");
   const sw=parseInt(localStorage.getItem("mdr-sideW")); if(sw) $("#sidebar").style.width=sw+"px";
