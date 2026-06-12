@@ -49,7 +49,7 @@ const defaultAddr = "127.0.0.1:8080"
 // banner is printed once at serve start.
 const banner = `
   ┌────────────────────────────────────────┐
-  │   mdserve · browse markdown as html     │
+  │   mdserve · browse markdown as html    │
   └────────────────────────────────────────┘`
 
 func main() {
