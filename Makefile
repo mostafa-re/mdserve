@@ -43,13 +43,13 @@ clean: ## Remove build output
 push: ## Push the current branch + annotated tags to origin
 	git push origin $(BRANCH) --follow-tags
 
-tag: ## Create + push an annotated release tag: make tag V=v0.4.2
+tag: ## Create + push a release tag: make tag V=v0.4.2
 	@test -n "$(V)" || { echo "usage: make tag V=vX.Y.Z"; exit 1; }
 	@echo "$(V)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$$' || { echo "tag must look like vX.Y.Z"; exit 1; }
 	@git diff --quiet && git diff --cached --quiet || { echo "working tree dirty — commit first"; exit 1; }
-	git tag -a "$(V)" -m "$(V)"
+	git tag "$(V)"
 	git push origin "$(V)"
-	@echo "pushed $(V) — GitHub Actions will build the release"
+	@echo "pushed $(V) — GitHub Actions will build the release (notes auto-generated)"
 
 release: ## Push the branch, then cut a release tag (triggers CI): make release V=v0.4.2
 	@test -n "$(V)" || { echo "usage: make release V=vX.Y.Z"; exit 1; }
