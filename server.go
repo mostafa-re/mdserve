@@ -56,6 +56,7 @@ func NewServer(opts Options) (*Server, error) {
 	page := strings.NewReplacer(
 		"__RELOAD__", reload,
 		"__DEFAULT__", opts.DefaultDoc,
+		"__VERSION__", versionString(),
 	).Replace(pageHTML)
 	return &Server{docDir: abs, opts: opts, page: page}, nil
 }

@@ -79,6 +79,8 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
 #brand .logo{width:22px;height:22px;border-radius:6px;flex:none}
 #brand .logo rect{fill:var(--logo)}
 #brand .name{font-size:15px;letter-spacing:.01em}
+#brand .ver{font-size:10px;font-weight:600;color:var(--muted);text-decoration:underline;
+  text-underline-offset:2px;letter-spacing:.02em;white-space:nowrap;align-self:flex-start;margin:9px 0 0 -4px}
 #brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
 #brand .cwd:empty{display:none}
@@ -275,11 +277,11 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 <body data-theme="dark" data-font="serif">
 
 <aside id="sidebar">
-  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="cwd" id="rootname"></span></div>
+  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="ver">__VERSION__</span><span class="cwd" id="rootname"></span></div>
   <div class="rail-top">
     <div class="filter">
-      <span class="sicon"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg></span>
-      <input id="filter" type="text" placeholder="Filter files  ( / )" spellcheck="false" autocomplete="off">
+      <span class="sicon"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Z"/></svg></span>
+      <input id="filter" type="text" placeholder="Filter docs  ( / )" spellcheck="false" autocomplete="off">
       <button class="clr" id="b-clr" title="Clear"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></svg></button>
     </div>
   </div>
@@ -756,7 +758,7 @@ function filterTree(q){
     }
   });
   if(!hits){ const d=document.createElement("div"); d.className="empty-filter";
-    d.textContent="No files match “"+q+"”"; tree.appendChild(d); }
+    d.textContent="No docs match “"+q+"”"; tree.appendChild(d); }
 }
 
 /* ---------- toolbar wiring ---------- */
