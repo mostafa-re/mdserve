@@ -1,0 +1,61 @@
+name: release
+
+# Cut a release by pushing a tag:  git tag v1.2.3 && git push origin v1.2.3
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # needed to create the GitHub Release and upload assets
+
+jobs:
+  build:
+    name: ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin,  goarch: amd64 }
+          - { goos: darwin,  goarch: arm64 }
+          - { goos: linux,   goarch: amd64 }
+          - { goos: linux,   goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME}"
+          bin=mdserve
+          [ "$GOOS" = windows ] && bin=mdserve.exe
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "$bin" .
+          name="mdserve_${version}_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = windows ]; then
+            zip -q "${name}.zip" "$bin"
+            echo "ASSET=${name}.zip" >> "$GITHUB_ENV"
+          else
+            tar -czf "${name}.tar.gz" "$bin"
+            echo "ASSET=${name}.tar.gz" >> "$GITHUB_ENV"
+          fi
+
+      - name: Checksum
+        run: sha256sum "$ASSET" > "${ASSET}.sha256"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+          fail_on_unmatched_files: true

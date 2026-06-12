@@ -34,11 +34,27 @@ network.
 ## Install
 
 ```sh
+# prebuilt binary (Linux / macOS, amd64 or arm64) → ~/.local/bin
+curl -fsSL https://raw.githubusercontent.com/mostafa-re/mdserve/main/scripts/install.sh | sh
+
+# or with Go
 go install github.com/mostafa-re/mdserve@latest
-# or, per-project pinned (Go 1.24+ tool directive):
-go get -tool github.com/mostafa-re/mdserve@v0.1.0
-# or a prebuilt binary / Homebrew tap (see .goreleaser.yaml)
 ```
+
+Windows: grab the `.zip` for your arch from the
+[releases page](https://github.com/mostafa-re/mdserve/releases). Set
+`MDSERVE_VERSION` / `MDSERVE_BINDIR` to pin a version or change the install dir.
+
+Update in place, or just check:
+
+```sh
+mdserve update          # download + replace the running binary with the latest release
+mdserve update --check  # only report whether a newer release exists
+mdserve version         # release tag, or dev+<commit> for a source build
+```
+
+Every `vX.Y.Z` tag is built for darwin/linux/windows × amd64/arm64 by GitHub
+Actions and attached to the release (see `.github/workflows/release.yml`).
 
 ## Usage
 

@@ -10,16 +10,23 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 )
+
+// pseudoVersion matches Go's synthetic module pseudo-versions, whose tail is a
+// 14-digit UTC timestamp and a 12-hex commit (e.g. v0.3.1-0.20260612135040-deaa63af60d0).
+var pseudoVersion = regexp.MustCompile(`[0-9]{14}-[0-9a-f]{12}`)
 
 const usage = `mdserve — serve a directory of Markdown as browsable HTML.
 
 usage:
   mdserve serve [flags]     start a live server (default if no command given)
   mdserve build [flags]     render to a static HTML tree and exit
-  mdserve version
+  mdserve update [--check]  replace this binary with the latest release
+  mdserve version           print the version (release tag, or dev+<commit>)
 
 serve flags:
   --dir string          directory of .md files (default ".", the current dir)
@@ -36,8 +43,52 @@ build flags:
   --no-cdn              deprecated: vendor assets are always embedded (no-op)
 `
 
-// version is overridable via -ldflags -X main.version=...
+// version is the release tag, injected via -ldflags -X main.version=<tag> by the
+// release workflow. Local builds leave it "dev"; versionString then derives a
+// dev+<commit> string from Go's embedded VCS stamp.
 var version = "dev"
+
+// repoSlug is the GitHub owner/repo used by `mdserve update` and install.sh.
+const repoSlug = "mostafa-re/mdserve"
+
+// versionString reports the build version: the release tag baked in via -ldflags,
+// else the module version from `go install <pkg>@vX`, else "dev+<short-commit>"
+// from the embedded VCS stamp (with -dirty when the tree was modified).
+func versionString() string {
+	if version != "dev" && version != "" {
+		return version
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "dev"
+	}
+	// A clean release tag from `go install <pkg>@vX.Y.Z`. Ignore Go's synthetic
+	// pseudo-versions (vX.Y.Z-0.<timestamp>-<commit>) — for those the user wants
+	// the dev+<commit> form below, not the noisy pseudo-version.
+	if v := info.Main.Version; v != "" && v != "(devel)" && !pseudoVersion.MatchString(v) {
+		return v
+	}
+	var rev, modified string
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			modified = s.Value
+		}
+	}
+	if rev == "" {
+		return "dev"
+	}
+	if len(rev) > 12 {
+		rev = rev[:12]
+	}
+	v := "dev+" + rev
+	if modified == "true" {
+		v += "-dirty"
+	}
+	return v
+}
 
 // defaultAddr binds loopback, not the wildcard ":8080". A wildcard bind succeeds
 // even when another process already holds 127.0.0.1:8080, which would shadow the
@@ -67,8 +118,10 @@ func main() {
 		runServe(args)
 	case "build":
 		runBuild(args)
-	case "version":
-		fmt.Println("mdserve", version)
+	case "update", "self-update", "upgrade":
+		runUpdate(args)
+	case "version", "--version", "-v":
+		fmt.Println("mdserve", versionString())
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
@@ -99,8 +152,9 @@ func runServe(args []string) {
 	}
 	url := "http://" + shown + "/"
 	fmt.Println(banner)
-	fmt.Printf("  %s\n\n", version)
-	fmt.Printf("mdserve: serving %s on %s\n", *dir, url)
+	fmt.Printf("  %s\n", versionString())
+	fmt.Printf("  dir: %s\n\n", srv.docDir)
+	fmt.Printf("mdserve: serving on %s\n", url)
 	if *open {
 		openBrowser(url)
 	}
