@@ -120,6 +120,17 @@ doc-build:  ## Render docs/ to docs/_site/
 > **Local docs only.** mdserve has no auth and renders raw repo Markdown; it
 > binds for local browsing. Never run it as a public/deployed service.
 
+## Development
+
+```sh
+make build              # build ./bin/mdserve (version stamped from git)
+make install            # go install, version-stamped
+make run                # build + serve the current dir, open the browser
+make test               # run the suite
+make release V=v0.4.2   # push the branch, then tag + push (triggers the release CI)
+make                    # list all targets
+```
+
 ## License
 
 [MIT](LICENSE).
