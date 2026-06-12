@@ -392,10 +392,15 @@ function stripMtime(nodes){
   return nodes.map(n => n.type==="dir"
     ? {n:n.name, c:stripMtime(n.children)} : {f:n.relpath});
 }
+// firstFile picks the doc to open on load: prefer a file at the current level
+// (any "readme*" first, then index/home, else the first file here); only if this
+// level has no files does it descend into folders, in order.
 function firstFile(nodes){
   const files = nodes.filter(n=>n.type==="file");
-  const pref = files.find(n=>/^(readme|index|home)\b/i.test(n.name));
-  if(pref) return pref.relpath;
+  const readme = files.find(n=>/^readme/i.test(n.name));
+  if(readme) return readme.relpath;
+  const landing = files.find(n=>/^(index|home)\b/i.test(n.name));
+  if(landing) return landing.relpath;
   if(files.length) return files[0].relpath;
   for(const n of nodes){
     const f = firstFile(n.children||[]);
@@ -411,6 +416,7 @@ function renderNodes(nodes){
     const row = document.createElement("div");
     row.className = "row";
     if(n.type==="dir"){
+      node.classList.add("closed");   // folders start collapsed; the active doc's branch auto-opens
       row.innerHTML = '<span class="caret">'+ICONS.chevron+'</span><span class="ico"><span class="f-open">'+ICONS.folderOpen+'</span><span class="f-closed">'+ICONS.folder+'</span></span>';
       const nm = document.createElement("span"); nm.className="name"; nm.textContent=n.name;
       row.appendChild(nm);
