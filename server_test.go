@@ -61,7 +61,7 @@ func TestServesReaderShell(t *testing.T) {
 		"<title>mdserve</title>",
 		`id="brand"`, `class="name">mdserve</span>`, `class="cwd" id="rootname"`, `id="sidefoot"`, // logo + title + cwd; version footer
 		`viewBox="0 -960 960 960"`, `<path d="'+p+'"`, // Material Symbols; MS() wraps path data (guards blank-icon regression)
-		"/vendor/marked.min.js", "/vendor/katex.min.css", // embedded vendor bundle (offline)
+		"/vendor/marked.min.js", "/vendor/katex.min.css", "/vendor/hljs-dark.css", // embedded vendor bundle (offline)
 		`id="filter"`, `id="b-theme"`, `id="b-font"`, `id="b-full"`, `id="b-out"`, `id="find-in"`, // controls incl. font + fullscreen
 		`--sel-strong`, `--logo`, `data-theme="dark"`, `data-font="sans"`, // accents; themed logo; dark + sans defaults
 		"window.MDSERVE",

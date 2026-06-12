@@ -19,7 +19,7 @@ const pageHTML = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mdserve</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f81f7'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="/vendor/hljs-theme.css">
+<link id="hljs-theme" rel="stylesheet" href="/vendor/hljs-dark.css">
 <link rel="stylesheet" href="/vendor/katex.min.css">
 <script>window.MDSERVE={reload:__RELOAD__,defaultDoc:"__DEFAULT__"};</script>
 <style>
@@ -199,7 +199,7 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
   background:var(--code-bg);color:var(--code-ink);padding:.15em .42em;border-radius:5px}
 #page pre{background:var(--code-bg);border:1px solid var(--border);border-radius:11px;
   padding:16px 18px;overflow:auto;margin:0 0 1.15em;line-height:1.55}
-#page pre code{background:none;padding:0;font-size:13px;filter:var(--hljs-filter)}
+#page pre code{background:none;padding:0;font-size:13px}
 #page .table-wrap{max-width:100%;overflow-x:auto;margin:0 0 1.2em}
 #page table{border-collapse:collapse;width:auto;margin:0;font-size:.92em;font-family:-apple-system,sans-serif}
 #page th,#page td{border:1px solid var(--border);padding:8px 13px;text-align:left}
@@ -844,6 +844,10 @@ function setTheme(t){
   state.theme=t; document.body.dataset.theme=t;
   localStorage.setItem("mdr-theme", t);
   setFavicon(t);
+  // swap the highlight.js stylesheet so code/markdown highlighting is crisp in
+  // each mode (a real dark theme for dark, the light theme for light/warm)
+  const hl=document.getElementById("hljs-theme");
+  if(hl) hl.href = t==="dark" ? "/vendor/hljs-dark.css" : "/vendor/hljs-theme.css";
   const b=$("#b-theme");
   if(b){ b.innerHTML=ICONS.theme[t]; b.title="Theme: "+t+" (click to change)"; }
 }
