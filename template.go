@@ -33,7 +33,7 @@ const pageTmpl = `<!doctype html>
     #bar{position:sticky;top:0;z-index:30;display:flex;align-items:stretch;height:var(--bar-h);background:var(--side);border-bottom:1px solid var(--line)}
     .brand{flex:0 0 var(--side-w);width:var(--side-w);min-width:0;display:inline-flex;align-items:center;gap:.45rem;padding:0 1rem;font-weight:700;font-size:.95rem;color:var(--fg);text-decoration:none;border-right:1px solid var(--line);overflow:hidden;white-space:nowrap}
     .brand .logo{width:22px;height:22px;flex:0 0 auto}
-    body[data-collapsed="1"] .brand{border-right:0}
+    body[data-collapsed="1"] .brand{flex:0 0 auto;width:auto;border-right:0}
     .tools{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:0 .7rem}
     .grp{display:flex;align-items:center;gap:.4rem;min-width:0}
     .grp>button{width:32px;height:32px;border:0;background:transparent;color:var(--muted);border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto}
@@ -54,6 +54,11 @@ const pageTmpl = `<!doctype html>
     :root[data-theme="light"] #theme .t-light{display:block}
     :root[data-theme="warm"] #theme .t-warm{display:block}
     :root[data-theme="dark"] #theme .t-dark{display:block}
+    /* sidebar toggle swaps panel-close (when open) / panel-open (when collapsed) */
+    #toggle .ic-popen{display:none}
+    body[data-collapsed="1"] #toggle .ic-pclose{display:none}
+    body[data-collapsed="1"] #toggle .ic-popen{display:block}
+    .zoom button .ic{width:15px;height:15px}
     #layout{display:grid;grid-template-columns:var(--side-w) 1fr;align-items:start}
     nav{background:var(--side);padding:1rem;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--line);position:sticky;top:var(--bar-h);height:calc(100vh - var(--bar-h));min-width:0}
     body[data-collapsed="1"]{--side-w:0}
@@ -71,7 +76,7 @@ const pageTmpl = `<!doctype html>
     #nav summary{list-style:none;font-weight:500;color:var(--fg)}
     #nav summary::-webkit-details-marker{display:none}
     #nav a span,#nav summary span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .ic{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+    .ic{width:16px;height:16px;flex:0 0 auto;fill:currentColor;stroke:none}
     summary .ic-open{display:none}
     details[open]>summary .ic-open{display:block}
     details[open]>summary .ic-closed{display:none}
@@ -97,26 +102,30 @@ const pageTmpl = `<!doctype html>
   </style>
 </head>
 <body data-doc="{{.Active}}">
+  <!-- Google Material Symbols (Rounded), inlined as a sprite. viewBox 0 -960 960 960, solid fills. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <symbol id="i-file" viewBox="0 0 16 16"><path d="M9 1.5H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5z"/><path d="M9 1.5V5.5H13"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 16 16"><path d="M1.5 4.2c0-.6.4-1 1-1h3.3l1.4 1.6h6.3c.6 0 1 .4 1 1v6.4c0 .6-.4 1-1 1H2.5c-.6 0-1-.4-1-1z"/></symbol>
-    <symbol id="i-folder-open" viewBox="0 0 16 16"><path d="M2 12.3V4.4a1 1 0 0 1 1-1h3.2l1.4 1.5h5.4a1 1 0 0 1 1 1v1.2"/><path d="M2 12.3l1.7-4.8a1 1 0 0 1 .95-.7h10.1a.6.6 0 0 1 .57.8l-1.25 4a1 1 0 0 1-.96.7H2z"/></symbol>
-    <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 13V3.5"/><path d="M3.5 8 8 3.5 12.5 8"/></symbol>
-    <symbol id="i-sun" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2"/><path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M13 3l-1.1 1.1M4.1 11.9 3 13"/></symbol>
-    <symbol id="i-warm" viewBox="0 0 16 16"><path d="M1.5 12.5h13"/><path d="M4.5 12.5a3.5 3.5 0 0 1 7 0"/><path d="M8 3.5v1.8M2.6 6.3l1.2 1.2M13.4 6.3l-1.2 1.2"/></symbol>
-    <symbol id="i-moon" viewBox="0 0 16 16"><path d="M13 9.6A5.5 5.5 0 1 1 6.4 3a4.3 4.3 0 0 0 6.6 6.6z"/></symbol>
-    <symbol id="i-sidebar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M6.5 3v10"/></symbol>
-    <symbol id="i-search" viewBox="0 0 16 16"><circle cx="6.8" cy="6.8" r="4.3"/><path d="M10 10 14.2 14.2"/></symbol>
-    <symbol id="i-x" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
-    <symbol id="i-filter" viewBox="0 0 16 16"><path d="M2 3.5h12l-4.6 5.6v3.4l-2.8 1.5V9.1z"/></symbol>
-    <symbol id="i-zoom-reset" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.7-3.8"/><path d="M13.3 3v2.4h-2.4"/></symbol>
+    <symbol id="i-file" viewBox="0 -960 960 960"><path d="M360-240h240q17 0 28.5-11.5T640-280q0-17-11.5-28.5T600-320H360q-17 0-28.5 11.5T320-280q0 17 11.5 28.5T360-240Zm0-160h240q17 0 28.5-11.5T640-440q0-17-11.5-28.5T600-480H360q-17 0-28.5 11.5T320-440q0 17 11.5 28.5T360-400ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h287q16 0 30.5 6t25.5 17l194 194q11 11 17 25.5t6 30.5v447q0 33-23.5 56.5T720-80H240Zm280-560v-160H240v640h480v-440H560q-17 0-28.5-11.5T520-640ZM240-800v200-200 640-640Z"/></symbol>
+    <symbol id="i-folder" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h207q16 0 30.5 6t25.5 17l57 57h320q33 0 56.5 23.5T880-640v400q0 33-23.5 56.5T800-160H160Zm0-80h640v-400H447l-80-80H160v480Zm0 0v-480 480Z"/></symbol>
+    <symbol id="i-folder-open" viewBox="0 -960 960 960"><path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h207q16 0 30.5 6t25.5 17l57 57h360q17 0 28.5 11.5T880-680q0 17-11.5 28.5T840-640H447l-80-80H160v480l79-263q8-26 29.5-41.5T316-560h516q41 0 64.5 32.5T909-457l-72 240q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm-84-262v-218 218Zm84 262 72-240-72 240Z"/></symbol>
+    <symbol id="i-up" viewBox="0 -960 960 960"><path d="M440-647 244-451q-12 12-28 11.5T188-452q-11-12-11.5-28t11.5-28l264-264q6-6 13-8.5t15-2.5q8 0 15 2.5t13 8.5l264 264q11 11 11 27.5T772-452q-12 12-28.5 12T715-452L520-647v447q0 17-11.5 28.5T480-160q-17 0-28.5-11.5T440-200v-447Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 -960 960 960"><path d="M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM80-440q-17 0-28.5-11.5T40-480q0-17 11.5-28.5T80-520h80q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440H80Zm720 0q-17 0-28.5-11.5T760-480q0-17 11.5-28.5T800-520h80q17 0 28.5 11.5T920-480q0 17-11.5 28.5T880-440h-80ZM480-760q-17 0-28.5-11.5T440-800v-80q0-17 11.5-28.5T480-920q17 0 28.5 11.5T520-880v80q0 17-11.5 28.5T480-760Zm0 720q-17 0-28.5-11.5T440-80v-80q0-17 11.5-28.5T480-200q17 0 28.5 11.5T520-160v80q0 17-11.5 28.5T480-40ZM226-678l-43-42q-12-11-11.5-28t11.5-29q12-12 29-12t28 12l42 43q11 12 11 28t-11 28q-11 12-27.5 11.5T226-678Zm494 495-42-43q-11-12-11-28.5t11-27.5q11-12 27.5-11.5T734-282l43 42q12 11 11.5 28T777-183q-12 12-29 12t-28-12Zm-42-495q-12-11-11.5-27.5T678-734l42-43q11-12 28-11.5t29 11.5q12 12 12 29t-12 28l-43 42q-12 11-28 11t-28-11ZM183-183q-12-12-12-29t12-28l43-42q12-11 28.5-11t27.5 11q12 11 11.5 27.5T282-226l-42 43q-11 12-28 11.5T183-183Zm297-297Z"/></symbol>
+    <symbol id="i-warm" viewBox="0 -960 960 960"><path d="M792-670q11 11 11 28t-11 28l-29 29q-12 12-28.5 12T706-585q-12-12-11.5-28.5T707-642l29-29q12-11 28.5-10.5T792-670ZM120-160q-17 0-28.5-11.5T80-200q0-17 11.5-28.5T120-240h720q17 0 28.5 11.5T880-200q0 17-11.5 28.5T840-160H120Zm360-640q17 0 28.5 11.5T520-760v40q0 17-11.5 28.5T480-680q-17 0-28.5-11.5T440-720v-40q0-17 11.5-28.5T480-800ZM170-672q11-11 28-11t28 11l29 29q12 12 12 28.5T255-586q-12 11-29 11t-28-12l-29-29q-11-12-10.5-28.5T170-672Zm127 272h366q-23-54-72-87t-111-33q-62 0-111 33t-72 87Zm-97 80q0-117 81.5-198.5T480-600q117 0 198.5 81.5T760-320H200Zm280-80Z"/></symbol>
+    <symbol id="i-moon" viewBox="0 -960 960 960"><path d="M480-120q-151 0-255.5-104.5T120-480q0-138 90-239.5T440-838q13-2 23 3.5t16 14.5q6 9 6.5 21t-7.5 23q-17 26-25.5 55t-8.5 61q0 90 63 153t153 63q31 0 61.5-9t54.5-25q11-7 22.5-6.5T819-479q10 5 15.5 15t3.5 24q-14 138-117.5 229T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></symbol>
+    <symbol id="i-panel-close" viewBox="0 -960 960 960"><path d="M660-368v-224q0-14-12-19t-22 5l-98 98q-12 12-12 28t12 28l98 98q10 10 22 5t12-19ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"/></symbol>
+    <symbol id="i-panel-open" viewBox="0 -960 960 960"><path d="M500-592v224q0 14 12 19t22-5l98-98q12-12 12-28t-12-28l-98-98q-10-10-22-5t-12 19ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm120-80v-560H200v560h120Zm80 0h360v-560H400v560Zm-80 0H200h120Z"/></symbol>
+    <symbol id="i-search" viewBox="0 -960 960 960"><path d="M380-320q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+    <symbol id="i-x" viewBox="0 -960 960 960"><path d="M480-424 284-228q-11 11-28 11t-28-11q-11-11-11-28t11-28l196-196-196-196q-11-11-11-28t11-28q11-11 28-11t28 11l196 196 196-196q11-11 28-11t28 11q11 11 11 28t-11 28L536-480l196 196q11 11 11 28t-11 28q-11 11-28 11t-28-11L480-424Z"/></symbol>
+    <symbol id="i-filter" viewBox="0 -960 960 960"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></symbol>
+    <symbol id="i-zoom-in" viewBox="0 -960 960 960"><path d="M340-540h-40q-17 0-28.5-11.5T260-580q0-17 11.5-28.5T300-620h40v-40q0-17 11.5-28.5T380-700q17 0 28.5 11.5T420-660v40h40q17 0 28.5 11.5T500-580q0 17-11.5 28.5T460-540h-40v40q0 17-11.5 28.5T380-460q-17 0-28.5-11.5T340-500v-40Zm40 220q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+    <symbol id="i-zoom-out" viewBox="0 -960 960 960"><path d="M320-540q-17 0-28.5-11.5T280-580q0-17 11.5-28.5T320-620h120q17 0 28.5 11.5T480-580q0 17-11.5 28.5T440-540H320Zm60 220q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l224 224q11 11 11 28t-11 28q-11 11-28 11t-28-11L532-372q-30 24-69 38t-83 14Zm0-80q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+    <symbol id="i-zoom-reset" viewBox="0 -960 960 960"><path d="M393-132q-103-29-168-113.5T160-440q0-57 19-108.5t54-94.5q11-12 27-12.5t29 12.5q11 11 11.5 27T290-586q-24 31-37 68t-13 78q0 81 47.5 144.5T410-209q13 4 21.5 15t8.5 24q0 20-14 31.5t-33 6.5Zm174 0q-19 5-33-7t-14-32q0-12 8.5-23t21.5-15q75-24 122.5-87T720-440q0-100-70-170t-170-70h-3l16 16q11 11 11 28t-11 28q-11 11-28 11t-28-11l-84-84q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l84-84q11-11 28-11t28 11q11 11 11 28t-11 28l-16 16h3q134 0 227 93t93 227q0 109-65 194T567-132Z"/></symbol>
   </svg>
   <header id="bar">
     <a class="brand" href="/" title="mdserve"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>mdserve</a>
     <div class="tools">
       <div class="grp">
-        <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic"><use href="#i-sidebar"/></svg></button>
-        <div class="zoom"><button id="zoomout" title="Zoom out" aria-label="Zoom out">−</button><input id="zoomval" title="Zoom level (type a %)" aria-label="Zoom level" value="100%"><button id="zoomin" title="Zoom in" aria-label="Zoom in">+</button></div>
+        <button id="toggle" title="Toggle sidebar" aria-label="Toggle sidebar"><svg class="ic ic-pclose"><use href="#i-panel-close"/></svg><svg class="ic ic-popen"><use href="#i-panel-open"/></svg></button>
+        <div class="zoom"><button id="zoomout" title="Zoom out" aria-label="Zoom out"><svg class="ic"><use href="#i-zoom-out"/></svg></button><input id="zoomval" title="Zoom level (type a %)" aria-label="Zoom level" value="100%"><button id="zoomin" title="Zoom in" aria-label="Zoom in"><svg class="ic"><use href="#i-zoom-in"/></svg></button></div>
         <button id="zoomreset" title="Reset zoom" aria-label="Reset zoom"><svg class="ic"><use href="#i-zoom-reset"/></svg></button>
       </div>
       <div class="grp">
