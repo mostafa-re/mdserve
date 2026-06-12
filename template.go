@@ -30,19 +30,19 @@ const pageHTML = `<!doctype html>
 [data-theme="warm"]{
   --app-bg:#edece6; --rail-bg:#f5f4ef; --paper:#fbfaf6; --ink:#34352f;
   --muted:#8c8b80; --faint:#b6b4a6; --accent:#8a7f6a; --accent-soft:#cdc8ba;
-  --active:#e8e5db; --border:#e5e2d8; --code-bg:#f1efe8; --code-ink:#56534a; --sel:#e9e4d6; --sel-strong:#b5651d;
+  --active:#e8e5db; --border:#e5e2d8; --code-bg:#f1efe8; --code-ink:#56534a; --sel:#e9e4d6; --sel-strong:#b5651d; --logo:#b5651d;
   --shadow:0 1px 2px rgba(60,55,40,.05),0 8px 26px rgba(60,55,40,.06); --hljs-filter:none;
 }
 [data-theme="light"]{
   --app-bg:#eceef1; --rail-bg:#f6f7f9; --paper:#ffffff; --ink:#23272e;
   --muted:#6b7480; --faint:#aab1bb; --accent:#5b6570; --accent-soft:#cdd3da;
-  --active:#e7eaef; --border:#e6e9ee; --code-bg:#f4f6f8; --code-ink:#2f363d; --sel:#d7dde6; --sel-strong:#0969da;
+  --active:#e7eaef; --border:#e6e9ee; --code-bg:#f4f6f8; --code-ink:#2f363d; --sel:#d7dde6; --sel-strong:#0969da; --logo:#0969da;
   --shadow:0 1px 2px rgba(40,50,70,.05),0 8px 26px rgba(40,50,70,.07); --hljs-filter:none;
 }
 [data-theme="dark"]{
   --app-bg:#16181c; --rail-bg:#1c1f25; --paper:#22262d; --ink:#dde2e9;
   --muted:#98a1ad; --faint:#5f6a77; --accent:#a7b0bd; --accent-soft:#3a414c;
-  --active:#2a2f37; --border:#2b313a; --code-bg:#191c22; --code-ink:#c6cfdb; --sel:#333b46; --sel-strong:#2f81f7;
+  --active:#2a2f37; --border:#2b313a; --code-bg:#191c22; --code-ink:#c6cfdb; --sel:#333b46; --sel-strong:#2f81f7; --logo:#2f81f7;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.45); --hljs-filter:invert(.92) hue-rotate(180deg);
 }
 *{box-sizing:border-box}
@@ -77,6 +77,7 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
   font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; user-select:none;
 }
 #brand .logo{width:22px;height:22px;border-radius:6px;flex:none}
+#brand .logo rect{fill:var(--logo)}
 #brand .name{font-size:15px;letter-spacing:.01em}
 #brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
@@ -271,7 +272,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 }
 </style>
 </head>
-<body data-theme="warm" data-font="serif">
+<body data-theme="dark" data-font="serif">
 
 <aside id="sidebar">
   <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="cwd" id="rootname"></span></div>
@@ -335,7 +336,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 "use strict";
 const $ = s => document.querySelector(s);
 const page = $("#page"), viewport = $("#viewport"), toc = $("#toc"), canvas = $("#canvas");
-let state = { path:null, zoom:1, tool:"select", theme:"warm", mtimes:{}, treeKey:"", obs:null };
+let state = { path:null, zoom:1, tool:"select", theme:"dark", mtimes:{}, treeKey:"", obs:null };
 let bootTarget = "";
 const THEMES = ["warm","light","dark"];
 const mermaidTheme = t => t==="dark" ? "dark" : (t==="warm" ? "neutral" : "default");
@@ -810,9 +811,17 @@ function setTool(t){
   $("#b-hand").classList.toggle("on", t==="hand");
   $("#b-select").classList.toggle("on", t==="select");
 }
+// favicon recolors with the theme (brown on warm, blue otherwise) to match the
+// menubar logo, which is themed via --logo.
+const FAVCOL = {dark:"#2f81f7", light:"#0969da", warm:"#b5651d"};
+function favSvg(c){
+  return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='"+encodeURIComponent(c)+"'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E";
+}
+function setFavicon(t){ const l=document.querySelector('link[rel="icon"]'); if(l) l.href=favSvg(FAVCOL[t]||FAVCOL.dark); }
 function setTheme(t){
   state.theme=t; document.body.dataset.theme=t;
   localStorage.setItem("mdr-theme", t);
+  setFavicon(t);
   const b=$("#b-theme");
   if(b){ b.innerHTML=ICONS.theme[t]; b.title="Theme: "+t+" (click to change)"; }
 }
@@ -873,7 +882,7 @@ async function poll(){
 
 /* ---------- boot ---------- */
 (function init(){
-  setTheme(localStorage.getItem("mdr-theme") || "warm");
+  setTheme(localStorage.getItem("mdr-theme") || "dark");
   setFont(localStorage.getItem("mdr-font") || "serif");
   updFull();
   if(localStorage.getItem("mdr-side")==="1") $("#sidebar").classList.add("collapsed");
