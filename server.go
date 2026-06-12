@@ -18,6 +18,11 @@ import (
 	"github.com/gomarkdown/markdown/parser"
 )
 
+// faviconSVG is the mdserve mark, served at /favicon.svg and /favicon.ico so a
+// browser's default favicon probe gets a 200 instead of a 404. (The in-page
+// favicon is a theme-colored data-URI managed by the client.)
+const faviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`
+
 // Options configures a Server.
 type Options struct {
 	Dir        string // directory of .md files
@@ -74,6 +79,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case p == "/" || p == "/index.html":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(w, s.page)
+	case p == "/favicon.svg" || p == "/favicon.ico":
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = io.WriteString(w, faviconSVG)
 	case p == "/api/tree":
 		writeJSON(w, map[string]any{
 			"root":     filepath.Base(s.docDir),

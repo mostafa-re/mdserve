@@ -59,7 +59,7 @@ func TestServesReaderShell(t *testing.T) {
 	body := rec.Body.String()
 	for _, want := range []string{
 		"<title>mdserve</title>",
-		`id="brand"`, `class="name">mdserve</span>`, `class="ver"`, `class="cwd" id="rootname"`, // logo + title + version + cwd
+		`id="brand"`, `class="name">mdserve</span>`, `class="cwd" id="rootname"`, `id="sidefoot"`, // logo + title + cwd; version footer
 		`viewBox="0 -960 960 960"`, `<path d="'+p+'"`, // Material Symbols; MS() wraps path data (guards blank-icon regression)
 		"/vendor/marked.min.js", "/vendor/katex.min.css", // embedded vendor bundle (offline)
 		`id="filter"`, `id="b-theme"`, `id="b-font"`, `id="b-full"`, `id="b-out"`, `id="find-in"`, // controls incl. font + fullscreen
@@ -161,6 +161,19 @@ func TestAPIPoll(t *testing.T) {
 	}
 	if _, ok := m["guide/intro.md"]; !ok {
 		t.Errorf("poll map missing guide/intro.md: %v", m)
+	}
+}
+
+func TestFaviconServed(t *testing.T) {
+	srv, _ := newTestServer(t)
+	for _, p := range []string{"/favicon.svg", "/favicon.ico"} {
+		rec := get(t, srv, p)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s status = %d, want 200 (no favicon probe 404)", p, rec.Code)
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "image/svg+xml") {
+			t.Errorf("%s content-type = %q, want image/svg+xml", p, ct)
+		}
 	}
 }
 

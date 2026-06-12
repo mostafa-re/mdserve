@@ -79,8 +79,11 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
 #brand .logo{width:22px;height:22px;border-radius:6px;flex:none}
 #brand .logo rect{fill:var(--logo)}
 #brand .name{font-size:15px;letter-spacing:.01em}
-#brand .ver{font-size:10px;font-weight:600;color:var(--muted);text-decoration:underline;
-  text-underline-offset:2px;letter-spacing:.02em;white-space:nowrap;align-self:flex-start;margin:9px 0 0 -4px}
+/* version footer pinned to the bottom of the sidebar (takes a sliver off the tree) */
+#sidefoot{flex:none;padding:7px 13px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#sidefoot .v{color:var(--muted);font-weight:600}
 #brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
 #brand .cwd:empty{display:none}
@@ -277,7 +280,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 <body data-theme="dark" data-font="sans">
 
 <aside id="sidebar">
-  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="ver">__VERSION__</span><span class="cwd" id="rootname"></span></div>
+  <div id="brand"><svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f81f7"/><path d="M9 11h14M9 16h14M9 21h9" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg><span class="name">mdserve</span><span class="cwd" id="rootname"></span></div>
   <div class="rail-top">
     <div class="filter">
       <span class="sicon"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Z"/></svg></span>
@@ -286,6 +289,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
     </div>
   </div>
   <div id="tree"></div>
+  <div id="sidefoot">mdserve <span class="v">__VERSION__</span></div>
   <div class="rail-resize" title="Drag to resize"></div>
 </aside>
 
