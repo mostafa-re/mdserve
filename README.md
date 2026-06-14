@@ -43,8 +43,8 @@ network.
   outline (`` Cmd/Ctrl \ ``); widths and state persist in `localStorage`.
 - **Auto outline** — a heading navigator with scroll-spy on the right.
 - **In-page find** — `Cmd/Ctrl F`, highlight and step through matches.
-- **Rich content** — GFM tables, syntax highlighting (highlight.js), Mermaid
-  diagrams, and KaTeX math, all from the embedded bundle.
+- **Rich content** — GFM tables & task lists, syntax highlighting (highlight.js),
+  Mermaid diagrams, and KaTeX math (currency-safe), all from the embedded bundle.
 - **Remembers where you were** — per-doc scroll position is restored.
 - **Live-reload** — the page polls for `.md` changes and re-renders in place.
 - **Browser auto-open** (`--open`); a **colorized, columnar request log**
@@ -52,6 +52,28 @@ network.
 - **Static build** — `mdserve build` renders a self-contained, offline HTML
   tree (the vendor bundle is copied alongside).
 - Path-traversal-safe; serves only `.md` under the configured root.
+
+## Rich content, rendered offline
+
+Docs render from the embedded vendor bundle — no CDN, no network, no build step:
+
+- **Syntax highlighting** — fenced code blocks via highlight.js, with a real
+  dark theme in dark mode.
+- **Mermaid diagrams** — fence a block as ` ```mermaid `.
+- **KaTeX math** — inline `$…$` and display `$$…$$`. Prices like `$100` stay as
+  text, so finance/crypto docs aren't mangled into math.
+- **GFM** — tables, task lists, strikethrough, and autolinks.
+- **Local images & assets** referenced by a doc are served too, and copied into
+  the static build.
+
+````markdown
+```mermaid
+flowchart LR
+  A[Markdown folder] --> B(mdserve) --> C[diagrams · math · highlighting]
+```
+
+Euler's identity, inline: $e^{i\pi} + 1 = 0$
+````
 
 ## Install
 
