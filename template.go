@@ -369,6 +369,16 @@ const ICONS = {
   theme: { warm: MS(PATH.warm), light: MS(PATH.light), dark: MS(PATH.dark) }
 };
 
+// Apply fn to every text node under root, skipping code/math/diagram subtrees.
+// Used to shield currency ($100) from KaTeX's $...$ inline-math delimiter.
+function mathWalk(root, fn){
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {acceptNode(n){
+    return n.parentElement && n.parentElement.closest("pre,code,script,style,textarea,.katex,.mermaid")
+      ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }});
+  const out=[]; for(let n; n=w.nextNode();) out.push(n);
+  for(const n of out){ const v=fn(n.nodeValue); if(v!==n.nodeValue) n.nodeValue=v; }
+}
+
 marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
 
 /* ---------- file tree ---------- */
@@ -516,6 +526,11 @@ function enhance(relpath){
     }catch(e){ console.warn("mermaid", e); }
   }
   try{
+    // KaTeX's $...$ inline delimiter would otherwise pair across currency
+    // amounts (e.g. "$100 ... $5,000"), rendering prices as math. Neutralize
+    // any $ immediately followed by a digit (a price, not math), render, restore.
+    const PH="\u0000";
+    mathWalk(page, s => s.replace(/(^|[^$])\$(?=\d)/g, "$1"+PH));
     renderMathInElement(page,{
       delimiters:[
         {left:"$$",right:"$$",display:true},
@@ -526,6 +541,7 @@ function enhance(relpath){
       ignoredTags:["script","noscript","style","textarea","pre","code"],
       throwOnError:false
     });
+    mathWalk(page, s => s.split(PH).join("$"));
   }catch(e){}
   const seen={};
   page.querySelectorAll("h1,h2,h3,h4").forEach(h=>{
@@ -990,10 +1006,23 @@ document.querySelectorAll("pre>code").forEach(function(c){
   } else { try{ hljs.highlightElement(c); }catch(e){} }
 });
 try{ mermaid.initialize({startOnLoad:true,securityLevel:"loose",theme:"neutral"}); }catch(e){}
-try{ renderMathInElement(document.getElementById("page"),{delimiters:[
-  {left:"$$",right:"$$",display:true},{left:"\\[",right:"\\]",display:true},
-  {left:"$",right:"$",display:false},{left:"\\(",right:"\\)",display:false}],
-  ignoredTags:["script","noscript","style","textarea","pre","code"],throwOnError:false}); }catch(e){}
+try{ (function(){
+  var page=document.getElementById("page"), PH="\u0000";
+  // shield currency ($100) from KaTeX's $...$ delimiter, then restore it
+  function walk(fn){
+    var w=document.createTreeWalker(page,NodeFilter.SHOW_TEXT,{acceptNode:function(n){
+      return n.parentElement&&n.parentElement.closest("pre,code,script,style,textarea,.katex,.mermaid")
+        ?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT;}});
+    var out=[],n; while(n=w.nextNode()) out.push(n);
+    out.forEach(function(t){ var v=fn(t.nodeValue); if(v!==t.nodeValue) t.nodeValue=v; });
+  }
+  walk(function(s){return s.replace(/(^|[^$])\$(?=\d)/g,"$1"+PH);});
+  renderMathInElement(page,{delimiters:[
+    {left:"$$",right:"$$",display:true},{left:"\\[",right:"\\]",display:true},
+    {left:"$",right:"$",display:false},{left:"\\(",right:"\\)",display:false}],
+    ignoredTags:["script","noscript","style","textarea","pre","code"],throwOnError:false});
+  walk(function(s){return s.split(PH).join("$");});
+})(); }catch(e){}
 </script>
 </body>
 </html>`
