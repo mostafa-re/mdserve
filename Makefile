@@ -10,7 +10,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X main.version=$(VERSION)
 
 .DEFAULT_GOAL := help
-.PHONY: help build install run test fmt vet clean push tag release
+.PHONY: help build install run test fmt vet clean version push tag release
 
 help: ## List targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -39,6 +39,20 @@ vet: ## go vet
 
 clean: ## Remove build output
 	rm -rf bin
+
+version: ## Show the version + changes since the latest tag (release-notes preview)
+	@echo "version:    $(VERSION)"
+	@last=$$(git describe --tags --abbrev=0 2>/dev/null); \
+	if [ -n "$$last" ]; then \
+	  echo "latest tag: $$last"; \
+	  range="$$last..HEAD"; \
+	else \
+	  echo "latest tag: (none)"; \
+	  range="HEAD"; \
+	fi; \
+	count=$$(git rev-list --count --no-merges $$range 2>/dev/null || echo 0); \
+	echo "changes:    $$count commit(s)"; \
+	git log --no-merges --pretty='  - %s' $$range
 
 push: ## Push the current branch + annotated tags to origin
 	git push origin $(BRANCH) --follow-tags
