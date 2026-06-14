@@ -1,8 +1,29 @@
-# <img src="favicon.svg" alt="" width="28" align="absmiddle"> mdserve
+# <img src="icon.svg" alt="" width="28" align="absmiddle"> mdserve
 
 A tiny, dependency-light Markdown docs server. Point it at a directory of `.md`
 files and browse them as HTML with a live left-nav; or render them to a static
 site.
+
+## Great for
+
+- **Reading what an LLM wrote.** Ask Claude/ChatGPT for a design doc, spec, or
+  research write-up, save the Markdown into a folder, then `mdserve` it — read
+  the result as a clean, zoomable page with a live outline and in-page find,
+  instead of scrolling raw text in a chat window.
+- **Browsing a repo's `docs/` offline** — tables, Mermaid diagrams, KaTeX math
+  and syntax-highlighted code all render with no build step and no network.
+- **Reviewing generated notes & reports** — plans, postmortems, meeting notes,
+  anything you keep as `.md`, in a calm PDF-like reading view.
+- **Publishing** a folder of Markdown as a self-contained, offline static site
+  with `mdserve build`.
+
+## Screenshots
+
+Three built-in themes — one toolbar button cycles them:
+
+| Dark (default) | Light | Warm |
+|:--:|:--:|:--:|
+| ![Dark theme](screenshots/dark.png) | ![Light theme](screenshots/light.png) | ![Warm theme](screenshots/warm.png) |
 
 ## Features
 
@@ -15,7 +36,7 @@ network.
   `net.Listen` on `:0`).
 - **PDF-like reading view** — a centered page you can zoom (buttons, `Ctrl ±`,
   or `Ctrl`+wheel anchored at the cursor) and pan with the hand tool.
-- **Three themes** — warm (default), light, dark; one button cycles them.
+- **Three themes** — dark (default), light, warm; one button cycles them.
 - **Folder tree + filter** — collapsible directories with Google Material
   Symbols file/folder icons; the `/` key jumps to the filter box.
 - **Collapsible, resizable rails** — the file sidebar (`Cmd/Ctrl B`) and the
@@ -127,7 +148,6 @@ make build              # build ./bin/mdserve (version stamped from git)
 make install            # go install, version-stamped
 make run                # build + serve the current dir, open the browser
 make test               # run the suite
-make release V=v0.4.2   # push the branch, then tag + push (triggers the release CI)
 make                    # list all targets
 ```
 
