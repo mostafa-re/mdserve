@@ -52,11 +52,35 @@ jobs:
       - name: Checksum
         run: sha256sum "$ASSET" > "${ASSET}.sha256"
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v2
+      # Each matrix job only stashes its artifacts; the release is published once,
+      # by the single `release` job below. (Calling action-gh-release from every
+      # matrix job races on the same release and duplicates the generated notes.)
+      - name: Stash artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: dist-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
             ${{ env.ASSET }}
             ${{ env.ASSET }}.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+
+      # Single create → release notes are generated exactly once.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
           fail_on_unmatched_files: true
           generate_release_notes: true   # auto-build the changelog from commits since the last tag
