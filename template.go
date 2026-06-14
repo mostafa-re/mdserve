@@ -167,7 +167,7 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
   width:780px; position:relative; background:transparent; color:var(--ink);
   padding:40px 48px 96px;
   font-family:var(--read-font,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif);
-  font-size:16px; line-height:1.68; transform-origin:0 0; will-change:transform;
+  font-size:16px; line-height:1.68; transform-origin:0 0;
   overflow-wrap:break-word;
 }
 #empty{max-width:620px;margin:14vh auto;text-align:center;color:var(--muted);font-family:-apple-system,sans-serif}
@@ -719,10 +719,21 @@ function showEmpty(){
 }
 
 /* ---------- zoom — transform:scale on #page, #canvas sized to match ---------- */
+// At 100% the page carries no transform at all, so it scrolls on the browser's
+// fast path instead of living on a permanently-rasterized compositor layer
+// (a permanent will-change:transform made long docs janky). The GPU hint is
+// added only while actively zooming, then dropped once idle.
+let whTimer = null;
+function hintTransform(){
+  page.style.willChange = "transform";
+  clearTimeout(whTimer);
+  whTimer = setTimeout(()=>{ page.style.willChange = "auto"; }, 400);
+}
 function applyTransform(){
-  page.style.transform = "scale("+state.zoom+")";
+  page.style.transform = state.zoom === 1 ? "none" : "scale("+state.zoom+")";
   canvas.style.width  = (page.offsetWidth  * state.zoom) + "px";
   canvas.style.height = (page.offsetHeight * state.zoom) + "px";
+  if(state.zoom !== 1) hintTransform();
 }
 function applyZoom(z){
   state.zoom = Math.min(3, Math.max(.4, z));
