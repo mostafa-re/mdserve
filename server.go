@@ -26,11 +26,10 @@ const faviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 
 // Options configures a Server.
 type Options struct {
-	Dir         string   // directory of .md files
-	DefaultDoc  string   // rel path opened first when none is in the URL hash / history
-	Reload      bool     // when true (serve), the page polls /api/poll for live-reload
-	Exclude     []string // glob patterns of dirs/files to hide from serving and build
-	UpdateCheck bool     // when true (serve), /api/update-check may reach GitHub
+	Dir        string   // directory of .md files
+	DefaultDoc string   // rel path opened first when none is in the URL hash / history
+	Reload     bool     // when true (serve), the page polls /api/poll for live-reload
+	Exclude    []string // glob patterns of dirs/files to hide from serving and build
 }
 
 // Server serves the single-page Markdown reader and its data endpoints. Markdown
@@ -138,8 +137,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		})
 	case p == "/api/poll":
 		writeJSON(w, s.flattenMtimes())
-	case p == "/api/update-check":
-		s.handleUpdateCheck(w, r)
 	case p == "/raw":
 		s.serveRaw(w, r)
 	case p == "/file":

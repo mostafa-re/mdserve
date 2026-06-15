@@ -94,18 +94,6 @@ body[data-font="sans"]{--read-font:"Noto Sans Arabic",-apple-system,BlinkMacSyst
   font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-variant-numeric:tabular-nums;letter-spacing:.01em}
 #sidefoot .v{color:var(--muted);font-weight:600}
-/* update-available toast (bottom corner, dismissible) */
-#update-banner{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:10px;
-  max-width:340px;padding:10px 12px;border-radius:10px;background:var(--rail-bg);color:var(--ink);
-  border:1px solid var(--border);box-shadow:var(--shadow);font-size:13px;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-#update-banner[hidden]{display:none}
-#update-banner .ub-text{flex:1;line-height:1.42}
-#update-banner .ub-text b{color:var(--accent)}
-#update-banner .ub-text code{background:var(--code-bg);color:var(--code-ink);padding:.1em .42em;border-radius:5px;font-size:.92em}
-#update-banner .ub-x{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
-  font-size:14px;line-height:1;padding:2px 5px;border-radius:6px}
-#update-banner .ub-x:hover{background:var(--active);color:var(--ink)}
 #brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
 #brand .cwd:empty{display:none}
@@ -248,8 +236,8 @@ body[data-font="sans"]{--read-font:"Noto Sans Arabic",-apple-system,BlinkMacSyst
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 #toc a:hover{color:var(--ink);background:rgba(0,0,0,.05)}
 [data-theme="dark"] #toc a:hover{background:rgba(255,255,255,.05)}
-#toc a.lvl2{padding-left:22px;font-size:12.5px}
-#toc a.lvl3{padding-left:34px;font-size:12px}
+#toc a.lvl2{padding-inline-start:22px;font-size:12.5px}
+#toc a.lvl3{padding-inline-start:34px;font-size:12px}
 #toc a.active{color:var(--sel-strong);font-weight:700;background:rgba(0,0,0,.04)}
 [data-theme="dark"] #toc a.active{background:rgba(255,255,255,.05)}
 
@@ -334,7 +322,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
     <button class="tbtn" id="b-full" title="Full screen"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M180-180h103q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150q-12.75 0-21.37-8.63Q120-137.25 120-150v-133q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v103Zm600 0v-103q0-12.75 8.68-21.38 8.67-8.62 21.5-8.62 12.82 0 21.32 8.62 8.5 8.63 8.5 21.38v133q0 12.75-8.62 21.37Q822.75-120 810-120H677q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h103ZM180-780v103q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-133q0-12.75 8.63-21.38Q137.25-840 150-840h133q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H180Zm600 0H677q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h133q12.75 0 21.38 8.62Q840-822.75 840-810v133q0 12.75-8.68 21.37-8.67 8.63-21.5 8.63-12.82 0-21.32-8.63-8.5-8.62-8.5-21.37v-103Z"/></svg></button>
     <button class="tbtn" id="b-print" title="Print / save as PDF"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M302-120q-24.75 0-42.37-17.63Q242-155.25 242-180v-116H140q-24.75 0-42.37-17.63Q80-331.25 80-356v-186q0-45.05 30.5-75.53Q141-648 186-648h588q45.05 0 75.53 30.47Q880-587.05 880-542v186q0 24.75-17.62 42.37Q844.75-296 820-296H718v116q0 24.75-17.62 42.37Q682.75-120 658-120H302Zm416-558H242v-102q0-24.75 17.63-42.38Q277.25-840 302-840h356q24.75 0 42.38 17.62Q718-804.75 718-780v102Zm21 185q12 0 21-9t9-21q0-12-9-21t-21-9q-12 0-21 9t-9 21q0 12 9 21t21 9ZM302-180h356v-192H302v192Z"/></svg></button>
     <button class="tbtn" id="b-find" title="Find in page (Cmd/Ctrl F)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M378-329q-108.16 0-183.08-75Q120-479 120-585t75-181q75-75 181.5-75t181 75Q632-691 632-584.85 632-542 618-502q-14 40-42 75l242 240q9 8.56 9 21.78T818-143q-9 9-22.22 9-13.22 0-21.78-9L533-384q-30 26-69.96 40.5Q423.08-329 378-329Zm-1-60q81.25 0 138.13-57.5Q572-504 572-585t-56.87-138.5Q458.25-781 377-781q-82.08 0-139.54 57.5Q180-666 180-585t57.46 138.5Q294.92-389 377-389Z"/></svg></button>
-    <div id="crumb"></div>
+    <div id="crumb" dir="auto"></div>
     <button class="tbtn" id="b-out" title="Toggle outline (Cmd/Ctrl \\)"><svg viewBox="0 -960 960 960" fill="currentColor"><path d="M150-280q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h490q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Zm0-170q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h490q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Zm0-170q-12.75 0-21.37-8.68-8.63-8.67-8.63-21.5 0-12.82 8.63-21.32 8.62-8.5 21.37-8.5h490q12.75 0 21.38 8.68 8.62 8.67 8.62 21.5 0 12.82-8.62 21.32-8.63 8.5-21.38 8.5H150Zm659.5 340q-12.5 0-21-8.63-8.5-8.62-8.5-21.37 0-12 8.63-21 8.62-9 21.37-9 12 0 21 9t9 21.5q0 12.5-9 21t-21.5 8.5Zm0-170q-12.5 0-21-8.63-8.5-8.62-8.5-21.37 0-12 8.63-21 8.62-9 21.37-9 12 0 21 9t9 21.5q0 12.5-9 21t-21.5 8.5Zm0-170q-12.5 0-21-8.63-8.5-8.62-8.5-21.37 0-12 8.63-21 8.62-9 21.37-9 12 0 21 9t9 21.5q0 12.5-9 21t-21.5 8.5Z"/></svg></button>
   </div>
   <div id="progress"></div>
@@ -356,11 +344,6 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
   <div class="rail-top"><span class="rail-title">Navigation</span></div>
   <div id="toc"></div>
 </aside>
-
-<div id="update-banner" hidden>
-  <span class="ub-text"></span>
-  <button class="ub-x" title="Dismiss" aria-label="Dismiss">&#10005;</button>
-</div>
 
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/highlight.min.js"></script>
@@ -409,8 +392,8 @@ function mathWalk(root, fn){
 }
 
 // Tag block elements dir="auto" so each picks its own direction from its first
-// strong character — Arabic/Persian read right-to-left, English left-to-right,
-// even mixed in one document. Code stays LTR via CSS.
+// strong character. Works for any RTL script (Arabic, Persian, Hebrew, …) and
+// LTR, even mixed in one document. Code stays LTR via CSS.
 function tagDir(root){
   root.querySelectorAll("p,li,h1,h2,h3,h4,h5,h6,blockquote,td,th,dt,dd,figcaption,summary")
       .forEach(el=>el.setAttribute("dir","auto"));
@@ -470,6 +453,7 @@ function renderNodes(nodes){
     node.className = "node";
     const row = document.createElement("div");
     row.className = "row";
+    row.setAttribute("dir","auto"); // RTL-named items (Arabic/Persian/Hebrew/…) flip the row
     if(n.type==="dir"){
       node.classList.add("closed");   // folders start collapsed; the active doc's branch auto-opens
       row.innerHTML = '<span class="caret">'+ICONS.chevron+'</span><span class="ico"><span class="f-open">'+ICONS.folderOpen+'</span><span class="f-closed">'+ICONS.folder+'</span></span>';
@@ -731,6 +715,7 @@ function buildOutline(){
   hs.forEach(h=>{
     const a=document.createElement("a");
     a.textContent=h.textContent; a.href="#"+h.id;
+    a.setAttribute("dir","auto"); // RTL headings get an RTL outline entry
     a.className = h.tagName==="H2"?"lvl2":h.tagName==="H3"?"lvl3":"";
     a.onclick=e=>{e.preventDefault(); scrollToEl(h);};
     toc.appendChild(a);
@@ -1002,23 +987,6 @@ async function poll(){
     fetch("/api/poll").then(r=>r.json()).then(m=>state.mtimes=m).catch(()=>{});
   });
   if(!(window.MDSERVE && window.MDSERVE.reload===false)) setInterval(poll, 2000);
-})();
-
-// Launch-time update check: one fail-silent call to /api/update-check. The
-// server keeps it offline-friendly (skips dev builds + when disabled, caches the
-// result ~24h). Show a dismissible toast only when a newer release exists; the
-// dismissal is keyed by tag so it reappears for the next version, not this one.
-(function(){
-  fetch("/api/update-check").then(r=>r.json()).then(d=>{
-    if(!d || !d.update || !d.latest) return;
-    if(localStorage.getItem("mdserve.update.dismissed") === d.latest) return;
-    const bar = $("#update-banner"); if(!bar) return;
-    bar.querySelector(".ub-text").innerHTML =
-      "mdserve <b>" + esc(d.latest) + "</b> available — run <code>mdserve update</code>";
-    bar.hidden = false;
-    bar.querySelector(".ub-x").onclick = ()=>{ bar.hidden = true;
-      localStorage.setItem("mdserve.update.dismissed", d.latest); };
-  }).catch(()=>{});
 })();
 </script>
 </body>

@@ -45,9 +45,10 @@ network.
 - **In-page find** — `Cmd/Ctrl F`, highlight and step through matches.
 - **Rich content** — GFM tables & task lists, syntax highlighting (highlight.js),
   Mermaid diagrams, and KaTeX math (currency-safe), all from the embedded bundle.
-- **Right-to-left ready** — Arabic & Persian render RTL automatically, per block,
-  with embedded Vazirmatn / Noto Sans Arabic fonts — even mixed with English, and
-  fully offline.
+- **Right-to-left ready** — any RTL script (Arabic, Persian, Hebrew, …) renders
+  RTL automatically, per block — including the file tree, outline, and
+  breadcrumb. Arabic & Persian ship embedded fonts; other scripts use the system
+  font. Mixes with English, fully offline.
 - **Remembers where you were** — per-doc scroll position is restored.
 - **Live-reload** — the page polls for `.md` changes and re-renders in place.
 - **Browser auto-open** (`--open`); a **colorized, columnar request log**
@@ -66,10 +67,11 @@ Docs render from the embedded vendor bundle — no CDN, no network, no build ste
 - **KaTeX math** — inline `$…$` and display `$$…$$`. Prices like `$100` stay as
   text, so finance/crypto docs aren't mangled into math.
 - **GFM** — tables, task lists, strikethrough, and autolinks.
-- **Right-to-left** — Arabic and Persian text flips to RTL automatically; each
-  block picks its own direction, so English and Persian can mix in one doc.
-  Body text uses the embedded **Vazirmatn** (serif toggle) / **Noto Sans Arabic**
-  (sans toggle) faces; fenced code stays left-to-right.
+- **Right-to-left** — any RTL script (Arabic, Persian, Hebrew, …) flips to RTL
+  automatically; each block picks its own direction, so LTR and RTL can mix in
+  one doc, and the file tree, outline, and breadcrumb follow suit. Arabic &
+  Persian use the embedded **Vazirmatn** (serif) / **Noto Sans Arabic** (sans)
+  faces; other RTL scripts use the system font. Fenced code stays left-to-right.
 - **Local images & assets** referenced by a doc are served too, and copied into
   the static build.
 
@@ -120,11 +122,12 @@ mdserve update --check  # only report whether a newer release exists
 mdserve version         # release tag, or dev+<commit> for a source build
 ```
 
-On launch the server quietly checks GitHub for a newer release and shows a
-dismissible banner in the reader if one exists. It runs only for release builds,
-caches the result for ~24h, and fails silently — so it never gets in the way of
-the offline-first workflow. Turn it off with `--no-update-check` or
-`MDSERVE_NO_UPDATE_CHECK`.
+`mdserve version` and the serve startup banner print a release indicator next to
+the version — a green `● latest` when you're up to date, or a yellow `● update
+available: vX.Y.Z` (with the update command) when a newer release exists. The
+check runs only for release builds, caches its result for ~24h, and fails
+silently — so it never gets in the way of the offline-first workflow. Turn it off
+with `--no-update-check` (serve) or `MDSERVE_NO_UPDATE_CHECK`.
 
 <details><summary>Build from source (needs Go)</summary>
 

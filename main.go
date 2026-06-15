@@ -127,7 +127,11 @@ func main() {
 	case "update", "self-update", "upgrade":
 		runUpdate(args)
 	case "version", "--version", "-v":
-		fmt.Println("mdserve", versionString())
+		line := "mdserve " + versionString()
+		if ind := updateIndicator(os.Getenv("MDSERVE_NO_UPDATE_CHECK") == ""); ind != "" {
+			line += "   " + ind
+		}
+		fmt.Println(line)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
@@ -166,7 +170,7 @@ func runServe(args []string) {
 	_ = noCDN
 
 	updateCheck := !*noUpdate && os.Getenv("MDSERVE_NO_UPDATE_CHECK") == ""
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload, Exclude: exclude, UpdateCheck: updateCheck})
+	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload, Exclude: exclude})
 	if err != nil {
 		fatal(err)
 	}
@@ -182,6 +186,10 @@ func runServe(args []string) {
 	fmt.Printf("  %s · %s\n\n", pl(files, "markdown file", "markdown files"), pl(dirs, "directory", "directories"))
 	fmt.Printf("  ➜  %s\n", url)
 	fmt.Printf("  %s\n\n", paint("90", "Ctrl+C to stop"))
+	// URL is already shown; the release check (cached ~24h, ≤5s) prints below it.
+	if ind := updateIndicator(updateCheck); ind != "" {
+		fmt.Printf("  %s\n\n", ind)
+	}
 	if *open {
 		openBrowser(url)
 	}

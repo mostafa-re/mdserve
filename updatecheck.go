@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,46 +9,36 @@ import (
 	"time"
 )
 
-// updateInfo is the JSON returned by GET /api/update-check. The reader fetches
-// it once at load and shows a banner when Update is true.
-type updateInfo struct {
-	Current  string `json:"current"`
-	Latest   string `json:"latest,omitempty"`
-	Update   bool   `json:"update"`
-	Dev      bool   `json:"dev,omitempty"`
-	Disabled bool   `json:"disabled,omitempty"`
-}
-
-// updateCheckTTL caps how often the server reaches GitHub: at most once per
-// window, the rest served from an in-memory + on-disk cache. Keeps the
-// offline-first promise — a launch never spams the network.
+// updateCheckTTL caps how often we reach GitHub: at most once per window, the
+// rest served from an in-memory + on-disk cache. Keeps the offline-first promise
+// — launching never spams the network.
 const updateCheckTTL = 24 * time.Hour
 
 // updateCheckTimeout bounds the single GitHub call so a slow network can't stall
-// the reader's banner fetch.
+// the CLI for long.
 const updateCheckTimeout = 5 * time.Second
 
-// handleUpdateCheck reports whether a newer release exists. It never blocks the
-// server on the network beyond updateCheckTimeout, never errors out to the
-// client, and is a no-op (no outbound call) for dev builds or when disabled.
-func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
-	cur := versionString()
-	if !s.opts.UpdateCheck {
-		writeJSON(w, updateInfo{Current: cur, Disabled: true})
-		return
+// updateIndicator returns a short, colored status comparing this build to the
+// latest GitHub release: a green "latest" when current, a yellow "update
+// available" line otherwise. It is empty (no output, no network) when disabled,
+// on a dev build, or when the check can't reach GitHub — so it stays silent and
+// offline-friendly. Shown by `mdserve version` and at serve startup.
+func updateIndicator(enabled bool) string {
+	if !enabled {
+		return ""
 	}
+	cur := versionString()
 	if !isReleaseVersion(cur) {
-		// dev / dev+commit / pseudo-version: nothing to update to, stay offline.
-		writeJSON(w, updateInfo{Current: cur, Dev: true})
-		return
+		return ""
 	}
 	latest, ok := cachedLatestTag()
 	if !ok {
-		// network/parse failure — fail silent, just say "no update".
-		writeJSON(w, updateInfo{Current: cur})
-		return
+		return ""
 	}
-	writeJSON(w, updateInfo{Current: cur, Latest: latest, Update: latest != cur})
+	if latest == cur {
+		return paint("32", "● latest")
+	}
+	return paint("33", "● update available: "+latest+" — run: mdserve update")
 }
 
 // isReleaseVersion reports whether v is a clean release tag (vX.Y.Z). Dev builds

@@ -9,52 +9,16 @@ import (
 	"testing"
 )
 
-// --- update check ---------------------------------------------------------
+// --- update indicator -----------------------------------------------------
 
-// The test binary is always a dev build (no -ldflags version), so the endpoint
-// must report dev and never touch the network.
-func TestUpdateCheckDevBuild(t *testing.T) {
-	dir := t.TempDir()
-	mustWrite(t, filepath.Join(dir, "README.md"), "# H\n")
-	srv, err := NewServer(Options{Dir: dir, UpdateCheck: true})
-	if err != nil {
-		t.Fatal(err)
+// The indicator must stay silent (and make no network call) when disabled, and
+// on a dev build — which the test binary always is (no -ldflags version).
+func TestUpdateIndicatorSilent(t *testing.T) {
+	if got := updateIndicator(false); got != "" {
+		t.Errorf("disabled indicator = %q, want empty", got)
 	}
-	rec := get(t, srv, "/api/update-check")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rec.Code)
-	}
-	var info updateInfo
-	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if !info.Dev {
-		t.Errorf("dev build should report dev=true, got %+v", info)
-	}
-	if info.Update {
-		t.Errorf("dev build should not advertise an update, got %+v", info)
-	}
-	if info.Current == "" {
-		t.Errorf("current version should be reported")
-	}
-}
-
-func TestUpdateCheckDisabled(t *testing.T) {
-	dir := t.TempDir()
-	mustWrite(t, filepath.Join(dir, "README.md"), "# H\n")
-	srv, err := NewServer(Options{Dir: dir, UpdateCheck: false})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var info updateInfo
-	if err := json.Unmarshal(get(t, srv, "/api/update-check").Body.Bytes(), &info); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if !info.Disabled {
-		t.Errorf("disabled check should report disabled=true, got %+v", info)
-	}
-	if info.Update {
-		t.Errorf("disabled check should not advertise an update, got %+v", info)
+	if got := updateIndicator(true); got != "" {
+		t.Errorf("dev-build indicator = %q, want empty (no release to compare, no network)", got)
 	}
 }
 
@@ -254,12 +218,32 @@ func TestRTLInStaticBuild(t *testing.T) {
 	}
 }
 
-// the update banner markup must exist in the reader so the client can reveal it
-func TestUpdateBannerMarkupPresent(t *testing.T) {
+// the web update banner was replaced by a CLI indicator — its markup, route, and
+// client wiring must be fully gone from the reader.
+func TestUpdateBannerRemoved(t *testing.T) {
 	srv, _ := newTestServer(t)
-	for _, want := range []string{`id="update-banner"`, `/api/update-check`, `mdserve.update.dismissed`} {
+	for _, gone := range []string{`id="update-banner"`, `/api/update-check`, `mdserve.update.dismissed`} {
+		if strings.Contains(srv.page, gone) {
+			t.Errorf("reader page still references removed update banner %q", gone)
+		}
+	}
+	if get(t, srv, "/api/update-check").Code != http.StatusNotFound {
+		t.Error("/api/update-check should be gone (404)")
+	}
+}
+
+// navigation (tree rows + outline entries) must carry dir="auto" so RTL-named
+// items render right-to-left.
+func TestNavRTLWiring(t *testing.T) {
+	srv, _ := newTestServer(t)
+	for _, want := range []string{
+		`row.setAttribute("dir","auto")`, // tree rows
+		`a.setAttribute("dir","auto")`,   // outline entries
+		`id="crumb" dir="auto"`,          // breadcrumb
+		`padding-inline-start`,           // outline indent flips for RTL
+	} {
 		if !strings.Contains(srv.page, want) {
-			t.Errorf("reader page missing update-banner wiring %q", want)
+			t.Errorf("reader page missing nav-RTL wiring %q", want)
 		}
 	}
 }
