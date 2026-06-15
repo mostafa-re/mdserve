@@ -32,15 +32,21 @@ serve flags:
   --dir string          directory of .md files (default ".", the current dir)
   --addr string         listen address; falls back to a free port if taken (default "127.0.0.1:8080")
   --default-doc string  doc opened first (default "README.md")
+  --exclude glob        hide dirs/files matching a glob (repeatable, comma-separated)
   --open                open the default browser at the served URL
   --no-reload           disable live-reload polling
+  --no-update-check     don't check GitHub for a newer release on launch
   --no-cdn              deprecated: vendor assets are always embedded (no-op)
 
 build flags:
   --dir string          directory of .md files (default ".", the current dir)
   --out string          output directory (required)
   --default-doc string  index doc (default "README.md")
+  --exclude glob        skip dirs/files matching a glob (repeatable, comma-separated)
   --no-cdn              deprecated: vendor assets are always embedded (no-op)
+
+The update check (serve) skips dev builds, caches its result ~24h, fails
+silently, and can be disabled with --no-update-check or MDSERVE_NO_UPDATE_CHECK.
 `
 
 // version is the release tag, injected via -ldflags -X main.version=<tag> by the
@@ -131,18 +137,36 @@ func main() {
 	}
 }
 
+// stringList is a flag.Value collecting --exclude: repeatable and
+// comma-separated, so --exclude a --exclude b,c yields [a b c].
+type stringList []string
+
+func (s *stringList) String() string { return strings.Join(*s, ",") }
+func (s *stringList) Set(v string) error {
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			*s = append(*s, p)
+		}
+	}
+	return nil
+}
+
 func runServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	dir := fs.String("dir", defaultDir, "directory of .md files")
 	addr := fs.String("addr", defaultAddr, "listen address (free-port fallback if taken)")
 	defDoc := fs.String("default-doc", "README.md", "doc opened at /")
+	var exclude stringList
+	fs.Var(&exclude, "exclude", "glob(s) to hide from serving (repeatable, comma-separated)")
 	open := fs.Bool("open", false, "open the browser")
 	noReload := fs.Bool("no-reload", false, "disable live-reload polling")
+	noUpdate := fs.Bool("no-update-check", false, "don't check GitHub for a newer release on launch")
 	noCDN := fs.Bool("no-cdn", false, "deprecated: vendor assets are always embedded (no-op)")
 	_ = fs.Parse(args)
 	_ = noCDN
 
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload})
+	updateCheck := !*noUpdate && os.Getenv("MDSERVE_NO_UPDATE_CHECK") == ""
+	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload, Exclude: exclude, UpdateCheck: updateCheck})
 	if err != nil {
 		fatal(err)
 	}
@@ -172,13 +196,15 @@ func runBuild(args []string) {
 	dir := fs.String("dir", defaultDir, "directory of .md files")
 	out := fs.String("out", "", "output directory (required)")
 	defDoc := fs.String("default-doc", "README.md", "index doc")
+	var exclude stringList
+	fs.Var(&exclude, "exclude", "glob(s) to skip from the build (repeatable, comma-separated)")
 	noCDN := fs.Bool("no-cdn", false, "deprecated: vendor assets are always embedded (no-op)")
 	_ = fs.Parse(args)
 	_ = noCDN
 	if *out == "" {
 		fatal(fmt.Errorf("build requires --out"))
 	}
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc})
+	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Exclude: exclude})
 	if err != nil {
 		fatal(err)
 	}

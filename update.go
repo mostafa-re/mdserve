@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,9 +63,23 @@ func httpGet(url string) (*http.Response, error) {
 	return (&http.Client{Timeout: 60 * time.Second}).Do(req)
 }
 
-// latestTag returns the tag_name of the latest GitHub release.
+// latestTag returns the tag_name of the latest GitHub release (60s timeout).
 func latestTag() (string, error) {
-	resp, err := httpGet("https://api.github.com/repos/" + repoSlug + "/releases/latest")
+	return latestTagCtx(60 * time.Second)
+}
+
+// latestTagCtx is latestTag with a caller-chosen timeout. The launch-time update
+// check (updatecheck.go) uses a short one so a slow network can't stall the page.
+func latestTagCtx(timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://api.github.com/repos/"+repoSlug+"/releases/latest", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", updateUA)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}

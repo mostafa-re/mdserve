@@ -54,9 +54,19 @@ body{
 }
 ::selection{background:var(--sel)}
 svg{fill:currentColor}
-/* reading font, toggled by the toolbar (serif default, sans optional) */
-body[data-font="serif"]{--read-font:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif}
-body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+/* embedded Arabic/Persian faces — unicode-range-scoped so they apply ONLY to
+   Arabic-script glyphs; Latin in the same line keeps the reading font below.
+   Both are variable woff2 (one file covers every weight). */
+@font-face{font-family:"Vazirmatn";src:url("/vendor/fonts/Vazirmatn-arabic.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;
+  unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+08A0-08FF,U+200C-200D,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:"Noto Sans Arabic";src:url("/vendor/fonts/NotoSansArabic-arabic.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;
+  unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+08A0-08FF,U+200C-200D,U+FB50-FDFF,U+FE70-FEFF}
+/* reading font, toggled by the toolbar (serif default, sans optional). The
+   Arabic faces are prepended so RTL text uses them while Latin falls through. */
+body[data-font="serif"]{--read-font:"Vazirmatn","Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif}
+body[data-font="sans"]{--read-font:"Noto Sans Arabic",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 
 /* ---- left sidebar : brand + filter + file tree ---- */
 #sidebar{
@@ -84,6 +94,18 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
   font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-variant-numeric:tabular-nums;letter-spacing:.01em}
 #sidefoot .v{color:var(--muted);font-weight:600}
+/* update-available toast (bottom corner, dismissible) */
+#update-banner{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:10px;
+  max-width:340px;padding:10px 12px;border-radius:10px;background:var(--rail-bg);color:var(--ink);
+  border:1px solid var(--border);box-shadow:var(--shadow);font-size:13px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#update-banner[hidden]{display:none}
+#update-banner .ub-text{flex:1;line-height:1.42}
+#update-banner .ub-text b{color:var(--accent)}
+#update-banner .ub-text code{background:var(--code-bg);color:var(--code-ink);padding:.1em .42em;border-radius:5px;font-size:.92em}
+#update-banner .ub-x{flex:none;border:none;background:transparent;color:var(--muted);cursor:pointer;
+  font-size:14px;line-height:1;padding:2px 5px;border-radius:6px}
+#update-banner .ub-x:hover{background:var(--active);color:var(--ink)}
 #brand .cwd{font-size:12px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;max-width:120px;padding-left:9px;margin-left:2px;border-left:1px solid var(--border)}
 #brand .cwd:empty{display:none}
@@ -176,7 +198,7 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
 
 /* ---- markdown content styling ---- */
 #page h1,#page h2,#page h3,#page h4{line-height:1.25;font-weight:700;
-  scroll-margin-top:24px;font-family:-apple-system,"Segoe UI",sans-serif}
+  scroll-margin-top:24px;font-family:"Noto Sans Arabic",-apple-system,"Segoe UI",sans-serif}
 #page h1{font-size:2.05em;margin:.2em 0 .55em;border-bottom:2px solid var(--border);padding-bottom:.28em}
 #page h2{font-size:1.5em;margin:1.7em 0 .6em;border-bottom:1px solid var(--border);padding-bottom:.22em}
 #page h3{font-size:1.22em;margin:1.5em 0 .5em}
@@ -200,9 +222,11 @@ body[data-font="sans"]{--read-font:-apple-system,BlinkMacSystemFont,"Segoe UI",R
 #page pre{background:var(--code-bg);border:1px solid var(--border);border-radius:11px;
   padding:16px 18px;overflow:auto;margin:0 0 1.15em;line-height:1.55}
 #page pre code{background:none;padding:0;font-size:13px}
+/* code is always left-to-right and isolated, even inside an RTL paragraph */
+#page pre,#page code{direction:ltr;unicode-bidi:isolate;text-align:left}
 #page .table-wrap{max-width:100%;overflow-x:auto;margin:0 0 1.2em}
-#page table{border-collapse:collapse;width:auto;margin:0;font-size:.92em;font-family:-apple-system,sans-serif}
-#page th,#page td{border:1px solid var(--border);padding:8px 13px;text-align:left}
+#page table{border-collapse:collapse;width:auto;margin:0;font-size:.92em;font-family:"Noto Sans Arabic",-apple-system,sans-serif}
+#page th,#page td{border:1px solid var(--border);padding:8px 13px;text-align:start}
 #page th{background:var(--code-bg);font-weight:700}
 #page tr:nth-child(even) td{background:rgba(0,0,0,.02)}
 [data-theme="dark"] #page tr:nth-child(even) td{background:rgba(255,255,255,.03)}
@@ -333,6 +357,11 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
   <div id="toc"></div>
 </aside>
 
+<div id="update-banner" hidden>
+  <span class="ub-text"></span>
+  <button class="ub-x" title="Dismiss" aria-label="Dismiss">&#10005;</button>
+</div>
+
 <script src="/vendor/marked.min.js"></script>
 <script src="/vendor/highlight.min.js"></script>
 <script src="/vendor/mermaid.min.js"></script>
@@ -377,6 +406,14 @@ function mathWalk(root, fn){
       ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }});
   const out=[]; for(let n; n=w.nextNode();) out.push(n);
   for(const n of out){ const v=fn(n.nodeValue); if(v!==n.nodeValue) n.nodeValue=v; }
+}
+
+// Tag block elements dir="auto" so each picks its own direction from its first
+// strong character — Arabic/Persian read right-to-left, English left-to-right,
+// even mixed in one document. Code stays LTR via CSS.
+function tagDir(root){
+  root.querySelectorAll("p,li,h1,h2,h3,h4,h5,h6,blockquote,td,th,dt,dd,figcaption,summary")
+      .forEach(el=>el.setAttribute("dir","auto"));
 }
 
 marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
@@ -504,6 +541,7 @@ const esc = s => s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))
 
 /* code blocks -> mermaid / highlight, headings, links, math, tables */
 function enhance(relpath){
+  tagDir(page);
   page.querySelectorAll("pre > code").forEach(code=>{
     const cls = [...code.classList].find(c=>c.startsWith("language-"));
     const lang = cls ? cls.slice(9) : "";
@@ -965,6 +1003,23 @@ async function poll(){
   });
   if(!(window.MDSERVE && window.MDSERVE.reload===false)) setInterval(poll, 2000);
 })();
+
+// Launch-time update check: one fail-silent call to /api/update-check. The
+// server keeps it offline-friendly (skips dev builds + when disabled, caches the
+// result ~24h). Show a dismissible toast only when a newer release exists; the
+// dismissal is keyed by tag so it reappears for the next version, not this one.
+(function(){
+  fetch("/api/update-check").then(r=>r.json()).then(d=>{
+    if(!d || !d.update || !d.latest) return;
+    if(localStorage.getItem("mdserve.update.dismissed") === d.latest) return;
+    const bar = $("#update-banner"); if(!bar) return;
+    bar.querySelector(".ub-text").innerHTML =
+      "mdserve <b>" + esc(d.latest) + "</b> available — run <code>mdserve update</code>";
+    bar.hidden = false;
+    bar.querySelector(".ub-x").onclick = ()=>{ bar.hidden = true;
+      localStorage.setItem("mdserve.update.dismissed", d.latest); };
+  }).catch(()=>{});
+})();
 </script>
 </body>
 </html>`
@@ -983,20 +1038,28 @@ const buildShell = `<!doctype html>
 <link rel="stylesheet" href="__ROOT__vendor/hljs-theme.css">
 <link rel="stylesheet" href="__ROOT__vendor/katex.min.css">
 <style>
+/* embedded Arabic/Persian faces, unicode-range-scoped (Latin falls through) */
+@font-face{font-family:"Vazirmatn";src:url("__ROOT__vendor/fonts/Vazirmatn-arabic.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;
+  unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+08A0-08FF,U+200C-200D,U+FB50-FDFF,U+FE70-FEFF}
+@font-face{font-family:"Noto Sans Arabic";src:url("__ROOT__vendor/fonts/NotoSansArabic-arabic.woff2") format("woff2");
+  font-weight:100 900;font-display:swap;
+  unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+08A0-08FF,U+200C-200D,U+FB50-FDFF,U+FE70-FEFF}
 [data-theme="warm"]{--bg:#fbfaf6;--ink:#34352f;--muted:#8c8b80;--border:#e5e2d8;--accent:#8a7f6a;--accent-soft:#cdc8ba;--code-bg:#f1efe8;--code-ink:#56534a;--hljs-filter:none}
 *{box-sizing:border-box}
 body{margin:0;background:#edece6;color:var(--ink);
-  font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;line-height:1.68}
+  font-family:"Vazirmatn","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;line-height:1.68}
 #page{max-width:820px;margin:0 auto;background:var(--bg);min-height:100vh;padding:48px 56px 96px}
-#page h1,#page h2,#page h3,#page h4{line-height:1.25;font-weight:700;font-family:-apple-system,"Segoe UI",sans-serif}
+#page h1,#page h2,#page h3,#page h4{line-height:1.25;font-weight:700;font-family:"Noto Sans Arabic",-apple-system,"Segoe UI",sans-serif}
 #page h1{font-size:2.05em;border-bottom:2px solid var(--border);padding-bottom:.28em}
 #page h2{font-size:1.5em;border-bottom:1px solid var(--border);padding-bottom:.22em;margin-top:1.7em}
 #page a{color:var(--accent)}
 #page pre{background:var(--code-bg);border:1px solid var(--border);border-radius:11px;padding:16px 18px;overflow:auto}
 #page code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86em;background:var(--code-bg);color:var(--code-ink);padding:.15em .42em;border-radius:5px}
 #page pre code{background:none;padding:0;filter:var(--hljs-filter)}
-#page table{border-collapse:collapse;font-size:.92em;font-family:-apple-system,sans-serif}
-#page th,#page td{border:1px solid var(--border);padding:8px 13px;text-align:left}
+#page pre,#page code{direction:ltr;unicode-bidi:isolate;text-align:left}
+#page table{border-collapse:collapse;font-size:.92em;font-family:"Noto Sans Arabic",-apple-system,sans-serif}
+#page th,#page td{border:1px solid var(--border);padding:8px 13px;text-align:start}
 #page th{background:var(--code-bg)}
 #page blockquote{margin:1.2em 0;padding:.5em 1.1em;border-left:4px solid var(--accent-soft);color:var(--muted)}
 #page img{max-width:100%}
@@ -1034,6 +1097,8 @@ try{ (function(){
     ignoredTags:["script","noscript","style","textarea","pre","code"],throwOnError:false});
   walk(function(s){return s.split(PH).join("$");});
 })(); }catch(e){}
+// dir="auto" per block so Arabic/Persian read right-to-left (code stays LTR via CSS)
+document.querySelectorAll("#page p,#page li,#page h1,#page h2,#page h3,#page h4,#page h5,#page h6,#page blockquote,#page td,#page th,#page dt,#page dd,#page figcaption,#page summary").forEach(function(el){el.setAttribute("dir","auto");});
 </script>
 </body>
 </html>`

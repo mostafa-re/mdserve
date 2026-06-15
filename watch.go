@@ -21,6 +21,11 @@ func (s *Server) flattenMtimes() map[string]float64 {
 			if strings.HasPrefix(d.Name(), ".") || d.Name() == "_site" {
 				return fs.SkipDir
 			}
+			if rel, e := filepath.Rel(s.docDir, p); e == nil {
+				if r := filepath.ToSlash(rel); r != "." && s.isExcluded(r) {
+					return fs.SkipDir
+				}
+			}
 			return nil
 		}
 		if !strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
@@ -28,6 +33,9 @@ func (s *Server) flattenMtimes() map[string]float64 {
 		}
 		rel, e := filepath.Rel(s.docDir, p)
 		if e != nil {
+			return nil
+		}
+		if s.isExcluded(filepath.ToSlash(rel)) {
 			return nil
 		}
 		if info, e := d.Info(); e == nil {

@@ -26,9 +26,11 @@ const faviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 
 // Options configures a Server.
 type Options struct {
-	Dir        string // directory of .md files
-	DefaultDoc string // rel path opened first when none is in the URL hash / history
-	Reload     bool   // when true (serve), the page polls /api/poll for live-reload
+	Dir         string   // directory of .md files
+	DefaultDoc  string   // rel path opened first when none is in the URL hash / history
+	Reload      bool     // when true (serve), the page polls /api/poll for live-reload
+	Exclude     []string // glob patterns of dirs/files to hide from serving and build
+	UpdateCheck bool     // when true (serve), /api/update-check may reach GitHub
 }
 
 // Server serves the single-page Markdown reader and its data endpoints. Markdown
@@ -36,9 +38,10 @@ type Options struct {
 // /api/tree; change detection from /api/poll; vendor assets from /vendor/. No
 // file is cached server-side — each request re-reads from disk.
 type Server struct {
-	docDir string
-	opts   Options
-	page   string // pageHTML with the per-server sentinels substituted
+	docDir  string
+	opts    Options
+	exclude []string // validated, lowercased copy of opts.Exclude (empty dropped)
+	page    string   // pageHTML with the per-server sentinels substituted
 }
 
 // NewServer constructs a Server rooted at opts.Dir.
@@ -55,6 +58,20 @@ func NewServer(opts Options) (*Server, error) {
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", abs)
 	}
+	var exclude []string
+	for _, pat := range opts.Exclude {
+		pat = strings.TrimSpace(pat)
+		if pat == "" {
+			continue
+		}
+		if _, err := path.Match(pat, "x"); err != nil {
+			return nil, fmt.Errorf("invalid --exclude pattern %q: %w", pat, err)
+		}
+		// lowercase so matching is case-insensitive, matching how case-insensitive
+		// filesystems (macOS/Windows) resolve the path — otherwise an excluded file
+		// stays directly fetchable via a differently-cased URL (e.g. Secret/x.md).
+		exclude = append(exclude, strings.ToLower(pat))
+	}
 	reload := "false"
 	if opts.Reload {
 		reload = "true"
@@ -64,7 +81,36 @@ func NewServer(opts Options) (*Server, error) {
 		"__DEFAULT__", opts.DefaultDoc,
 		"__VERSION__", versionString(),
 	).Replace(pageHTML)
-	return &Server{docDir: abs, opts: opts, page: page}, nil
+	return &Server{docDir: abs, opts: opts, exclude: exclude, page: page}, nil
+}
+
+// isExcluded reports whether a slash-separated path under docDir matches any
+// --exclude pattern: either the full relpath, or (for slashless patterns) any
+// single path segment — so "node_modules" prunes that dir and its whole subtree
+// at any depth, "*.private.md" matches by filename, "drafts/*" by path. Matching
+// is case-insensitive (patterns are lowercased in NewServer).
+func (s *Server) isExcluded(rel string) bool {
+	if len(s.exclude) == 0 {
+		return false
+	}
+	rel = strings.ToLower(path.Clean(rel))
+	if rel == "." || rel == "/" {
+		return false
+	}
+	segs := strings.Split(rel, "/")
+	for _, pat := range s.exclude {
+		if ok, _ := path.Match(pat, rel); ok {
+			return true
+		}
+		if !strings.Contains(pat, "/") {
+			for _, seg := range segs {
+				if ok, _ := path.Match(pat, seg); ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // ServeHTTP routes:
@@ -88,10 +134,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"root":     filepath.Base(s.docDir),
 			"rootPath": s.docDir,
-			"tree":     buildAPITree(s.docDir, ""),
+			"tree":     s.buildAPITree(s.docDir, ""),
 		})
 	case p == "/api/poll":
 		writeJSON(w, s.flattenMtimes())
+	case p == "/api/update-check":
+		s.handleUpdateCheck(w, r)
 	case p == "/raw":
 		s.serveRaw(w, r)
 	case p == "/file":
@@ -149,6 +197,9 @@ func (s *Server) resolvePath(rel string) (string, bool) {
 	if full != s.docDir && !strings.HasPrefix(full+sep, s.docDir+sep) {
 		return "", false
 	}
+	if s.isExcluded(path.Clean("/" + rel)[1:]) {
+		return "", false
+	}
 	if info, err := os.Stat(full); err != nil || info.IsDir() {
 		return "", false
 	}
@@ -177,7 +228,7 @@ type apiNode struct {
 // buildAPITree builds a recursive .md tree under absDir: directories first
 // (pruned when they contain no markdown), then files, each group sorted
 // case-insensitively. Hidden dirs and the build output (_site) are skipped.
-func buildAPITree(absDir, rel string) []apiNode {
+func (s *Server) buildAPITree(absDir, rel string) []apiNode {
 	entries, err := os.ReadDir(absDir)
 	if err != nil {
 		return []apiNode{}
@@ -203,16 +254,23 @@ func buildAPITree(absDir, rel string) []apiNode {
 	out := []apiNode{}
 	for _, d := range dirs {
 		childRel := relJoin(rel, d.Name())
-		if ch := buildAPITree(filepath.Join(absDir, d.Name()), childRel); len(ch) > 0 {
+		if s.isExcluded(childRel) {
+			continue
+		}
+		if ch := s.buildAPITree(filepath.Join(absDir, d.Name()), childRel); len(ch) > 0 {
 			out = append(out, apiNode{Type: "dir", Name: d.Name(), Relpath: childRel, Children: ch})
 		}
 	}
 	for _, f := range files {
+		fileRel := relJoin(rel, f.Name())
+		if s.isExcluded(fileRel) {
+			continue
+		}
 		var mt float64
 		if info, err := f.Info(); err == nil {
 			mt = float64(info.ModTime().UnixNano()) / 1e9
 		}
-		out = append(out, apiNode{Type: "file", Name: f.Name(), Relpath: relJoin(rel, f.Name()), Mtime: mt})
+		out = append(out, apiNode{Type: "file", Name: f.Name(), Relpath: fileRel, Mtime: mt})
 	}
 	return out
 }
@@ -314,8 +372,16 @@ func (s *Server) copyAssets(outDir string) error {
 		if err != nil {
 			return err
 		}
+		rel, err := filepath.Rel(s.docDir, p)
+		if err != nil {
+			return err
+		}
+		slashRel := filepath.ToSlash(rel)
 		if d.IsDir() {
 			if strings.HasPrefix(d.Name(), ".") || d.Name() == "_site" {
+				return fs.SkipDir
+			}
+			if slashRel != "." && s.isExcluded(slashRel) {
 				return fs.SkipDir
 			}
 			return nil
@@ -323,9 +389,8 @@ func (s *Server) copyAssets(outDir string) error {
 		if strings.HasSuffix(strings.ToLower(d.Name()), ".md") {
 			return nil
 		}
-		rel, err := filepath.Rel(s.docDir, p)
-		if err != nil {
-			return err
+		if s.isExcluded(slashRel) {
+			return nil
 		}
 		dst := filepath.Join(outDir, rel)
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {

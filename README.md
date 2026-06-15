@@ -45,6 +45,9 @@ network.
 - **In-page find** — `Cmd/Ctrl F`, highlight and step through matches.
 - **Rich content** — GFM tables & task lists, syntax highlighting (highlight.js),
   Mermaid diagrams, and KaTeX math (currency-safe), all from the embedded bundle.
+- **Right-to-left ready** — Arabic & Persian render RTL automatically, per block,
+  with embedded Vazirmatn / Noto Sans Arabic fonts — even mixed with English, and
+  fully offline.
 - **Remembers where you were** — per-doc scroll position is restored.
 - **Live-reload** — the page polls for `.md` changes and re-renders in place.
 - **Browser auto-open** (`--open`); a **colorized, columnar request log**
@@ -63,6 +66,10 @@ Docs render from the embedded vendor bundle — no CDN, no network, no build ste
 - **KaTeX math** — inline `$…$` and display `$$…$$`. Prices like `$100` stay as
   text, so finance/crypto docs aren't mangled into math.
 - **GFM** — tables, task lists, strikethrough, and autolinks.
+- **Right-to-left** — Arabic and Persian text flips to RTL automatically; each
+  block picks its own direction, so English and Persian can mix in one doc.
+  Body text uses the embedded **Vazirmatn** (serif toggle) / **Noto Sans Arabic**
+  (sans toggle) faces; fenced code stays left-to-right.
 - **Local images & assets** referenced by a doc are served too, and copied into
   the static build.
 
@@ -83,8 +90,10 @@ No toolchain needed — grab a prebuilt binary:
 curl -fsSL https://raw.githubusercontent.com/mostafa-re/mdserve/main/scripts/install.sh | sh
 ```
 
-Detects your OS/arch and installs to `~/.local/bin` (override with
-`MDSERVE_VERSION` / `MDSERVE_BINDIR`).
+Detects your OS/arch and installs to `~/.local/bin`, and adds that dir to your
+`PATH` (in your shell rc) when it isn't already there — no root needed. Override
+the version or dir with `MDSERVE_VERSION` / `MDSERVE_BINDIR`; skip the PATH edit
+with `MDSERVE_NO_MODIFY_PATH`.
 
 ### Releases
 
@@ -111,6 +120,12 @@ mdserve update --check  # only report whether a newer release exists
 mdserve version         # release tag, or dev+<commit> for a source build
 ```
 
+On launch the server quietly checks GitHub for a newer release and shows a
+dismissible banner in the reader if one exists. It runs only for release builds,
+caches the result for ~24h, and fails silently — so it never gets in the way of
+the offline-first workflow. Turn it off with `--no-update-check` or
+`MDSERVE_NO_UPDATE_CHECK`.
+
 <details><summary>Build from source (needs Go)</summary>
 
 ```sh
@@ -127,6 +142,7 @@ mdserve serve --dir docs --open                 # serve, free-port, open browser
 mdserve serve --dir docs --addr :9000           # fixed port
 mdserve build --dir docs --out site             # static HTML tree
 mdserve serve --dir docs --default-doc plan/README.md   # custom landing doc
+mdserve serve --exclude node_modules --exclude "*.private.md"  # hide paths
 ```
 
 | flag | default | notes |
@@ -134,10 +150,16 @@ mdserve serve --dir docs --default-doc plan/README.md   # custom landing doc
 | `--dir` | `.` | directory of `.md` files (defaults to the current dir) |
 | `--addr` | `127.0.0.1:8080` | loopback only; falls back to a free port if taken |
 | `--default-doc` | `README.md` | doc opened at `/` |
+| `--exclude` | — | glob(s) to hide dirs/files; repeatable & comma-separated |
 | `--open` | off | open the browser |
 | `--no-reload` | off | disable live-reload polling (serve) |
+| `--no-update-check` | off | skip the launch-time release check (serve) |
 | `--no-cdn` | off | deprecated — assets are always embedded (no-op) |
 | `--out` | — | output dir (build, required) |
+
+`--exclude` hides matching paths from the nav, direct URLs, and the static
+build. It matches by path name (case-insensitively), not by symlink target, so
+it's a convenience filter — not a security boundary.
 
 ## Design
 
