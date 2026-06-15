@@ -181,15 +181,16 @@ func runServe(args []string) {
 	url := "http://" + shown + "/"
 	files, dirs := srv.stats()
 	fmt.Println(banner)
-	fmt.Printf("  %s\n", versionString())
+	// indicator sits inline after the version; cached ~24h, ≤5s on a cold check
+	if ind := updateIndicator(updateCheck); ind != "" {
+		fmt.Printf("  %s   %s\n", versionString(), ind)
+	} else {
+		fmt.Printf("  %s\n", versionString())
+	}
 	fmt.Printf("  %s\n", srv.docDir)
 	fmt.Printf("  %s · %s\n\n", pl(files, "markdown file", "markdown files"), pl(dirs, "directory", "directories"))
 	fmt.Printf("  ➜  %s\n", url)
 	fmt.Printf("  %s\n\n", paint("90", "Ctrl+C to stop"))
-	// URL is already shown; the release check (cached ~24h, ≤5s) prints below it.
-	if ind := updateIndicator(updateCheck); ind != "" {
-		fmt.Printf("  %s\n\n", ind)
-	}
 	if *open {
 		openBrowser(url)
 	}

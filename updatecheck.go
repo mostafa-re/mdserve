@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,10 +36,52 @@ func updateIndicator(enabled bool) string {
 	if !ok {
 		return ""
 	}
-	if latest == cur {
-		return paint("32", "● latest")
+	// Only a strictly-newer release is an update — never suggest a downgrade when
+	// this build is ahead of the latest published release.
+	if isNewer(latest, cur) {
+		return paint("33", "● update available: "+latest+" — run: mdserve update")
 	}
-	return paint("33", "● update available: "+latest+" — run: mdserve update")
+	return paint("32", "● latest")
+}
+
+// isNewer reports whether release tag b is strictly newer than a (both vX.Y.Z).
+// Dependency-free numeric compare; on any parse ambiguity it returns false, so we
+// never advertise a downgrade.
+func isNewer(b, a string) bool {
+	bp, okb := parseSemver(b)
+	ap, oka := parseSemver(a)
+	if !okb || !oka {
+		return false
+	}
+	for i := range bp {
+		if bp[i] != ap[i] {
+			return bp[i] > ap[i]
+		}
+	}
+	return false
+}
+
+// parseSemver extracts major.minor.patch from a tag like "v1.2.3", dropping a "v"
+// prefix and any -prerelease / +build suffix. ok is false if it isn't numeric
+// dotted (≤3 parts).
+func parseSemver(v string) ([3]int, bool) {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	parts := strings.Split(v, ".")
+	if len(parts) == 0 || len(parts) > 3 {
+		return [3]int{}, false
+	}
+	var out [3]int
+	for i, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 {
+			return [3]int{}, false
+		}
+		out[i] = n
+	}
+	return out, true
 }
 
 // isReleaseVersion reports whether v is a clean release tag (vX.Y.Z). Dev builds

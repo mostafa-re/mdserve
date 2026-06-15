@@ -41,6 +41,29 @@ func TestIsReleaseVersion(t *testing.T) {
 	}
 }
 
+// the indicator must never advertise a downgrade — only a strictly-newer release.
+func TestIsNewer(t *testing.T) {
+	cases := []struct {
+		b, a string
+		want bool
+	}{
+		{"v0.6.1", "v0.6.0", true},        // newer patch
+		{"v0.6.0", "v0.6.1", false},       // older — never suggest a downgrade
+		{"v0.6.0", "v0.6.0", false},       // equal
+		{"v1.0.0", "v0.9.9", true},        // newer major
+		{"v0.10.0", "v0.9.0", true},       // numeric, not lexical (10 > 9)
+		{"v0.6.0", "v0.6.0+dirty", false}, // build metadata stripped → equal
+		{"v0.6.1", "v0.6.0-rc1", true},    // prerelease stripped
+		{"garbage", "v0.6.0", false},      // unparseable → false
+		{"v0.6.1", "weird", false},
+	}
+	for _, c := range cases {
+		if got := isNewer(c.b, c.a); got != c.want {
+			t.Errorf("isNewer(%q, %q) = %v, want %v", c.b, c.a, got, c.want)
+		}
+	}
+}
+
 // --- exclude --------------------------------------------------------------
 
 func TestIsExcluded(t *testing.T) {

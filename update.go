@@ -34,7 +34,7 @@ func runUpdate(args []string) {
 	}
 	fmt.Printf("mdserve: current %s\n", cur)
 	fmt.Printf("mdserve: latest  %s\n", latest)
-	if latest == cur {
+	if !isNewer(latest, cur) {
 		fmt.Println("mdserve: already up to date")
 		return
 	}
