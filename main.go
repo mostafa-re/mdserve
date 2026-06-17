@@ -14,6 +14,9 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+
+	"github.com/mostafa-re/mdserve/internal/ansi"
+	"github.com/mostafa-re/mdserve/internal/server"
 )
 
 // pseudoVersion matches Go's synthetic module pseudo-versions, whose tail is a
@@ -170,7 +173,7 @@ func runServe(args []string) {
 	_ = noCDN
 
 	updateCheck := !*noUpdate && os.Getenv("MDSERVE_NO_UPDATE_CHECK") == ""
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload, Exclude: exclude})
+	srv, err := server.NewServer(server.Options{Dir: *dir, DefaultDoc: *defDoc, Reload: !*noReload, Exclude: exclude, Version: versionString()})
 	if err != nil {
 		fatal(err)
 	}
@@ -179,7 +182,7 @@ func runServe(args []string) {
 		fatal(err)
 	}
 	url := "http://" + shown + "/"
-	files, dirs := srv.stats()
+	files, dirs := srv.Stats()
 	fmt.Println(banner)
 	// indicator sits inline after the version; cached ~24h, ≤5s on a cold check
 	if ind := updateIndicator(updateCheck); ind != "" {
@@ -187,14 +190,14 @@ func runServe(args []string) {
 	} else {
 		fmt.Printf("  %s\n", versionString())
 	}
-	fmt.Printf("  %s\n", srv.docDir)
+	fmt.Printf("  %s\n", srv.Dir())
 	fmt.Printf("  %s · %s\n\n", pl(files, "markdown file", "markdown files"), pl(dirs, "directory", "directories"))
 	fmt.Printf("  ➜  %s\n", url)
-	fmt.Printf("  %s\n\n", paint("90", "Ctrl+C to stop"))
+	fmt.Printf("  %s\n\n", ansi.Paint("90", "Ctrl+C to stop"))
 	if *open {
 		openBrowser(url)
 	}
-	httpSrv := &http.Server{Handler: logRequests(srv)} //nolint:gosec // local dev server
+	httpSrv := &http.Server{Handler: server.LogRequests(srv)} //nolint:gosec // local dev server
 	if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		fatal(err)
 	}
@@ -213,7 +216,7 @@ func runBuild(args []string) {
 	if *out == "" {
 		fatal(fmt.Errorf("build requires --out"))
 	}
-	srv, err := NewServer(Options{Dir: *dir, DefaultDoc: *defDoc, Exclude: exclude})
+	srv, err := server.NewServer(server.Options{Dir: *dir, DefaultDoc: *defDoc, Exclude: exclude})
 	if err != nil {
 		fatal(err)
 	}

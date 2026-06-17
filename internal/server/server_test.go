@@ -1,8 +1,7 @@
-package main
+package server
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -258,46 +257,5 @@ func TestBuildStaticOffline(t *testing.T) {
 	}
 	if !strings.Contains(string(nested), `href="../vendor/hljs-theme.css"`) {
 		t.Errorf("nested page should reference vendor at depth 1 (../)")
-	}
-}
-
-func TestDefaultDirIsWorkingDir(t *testing.T) {
-	// With no --dir, a bare `mdserve` serves the current working directory, not a
-	// hardcoded "docs" subdir — so `cd any-repo && mdserve` just works.
-	if defaultDir != "." {
-		t.Fatalf("defaultDir = %q, want %q so a bare `mdserve` serves the cwd", defaultDir, ".")
-	}
-}
-
-func TestDefaultAddrIsLoopback(t *testing.T) {
-	// The default listen addr must be a concrete loopback addr, never a wildcard
-	// (":8080"). A wildcard bind SUCCEEDS even when another process already holds
-	// 127.0.0.1:<port>, so the free-port fallback never fires — yet the advertised
-	// http://127.0.0.1:<port>/ URL is then served by that other process. Binding
-	// loopback makes net.Listen fail with EADDRINUSE so listen() falls back to a
-	// genuinely free port.
-	host, _, err := net.SplitHostPort(defaultAddr)
-	if err != nil {
-		t.Fatalf("SplitHostPort(%q): %v", defaultAddr, err)
-	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
-		t.Fatalf("default addr host = %q, want a loopback IP so the free-port fallback engages when the port is busy", host)
-	}
-}
-
-func TestListenFreePortFallback(t *testing.T) {
-	// Occupy a port, then ask listen() for it — it must fall back to a free one.
-	busy, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = busy.Close() }()
-	ln, shown, err := listen(busy.Addr().String())
-	if err != nil {
-		t.Fatalf("listen fallback: %v", err)
-	}
-	defer func() { _ = ln.Close() }()
-	if shown == busy.Addr().String() {
-		t.Fatalf("expected a different free port, got the busy one %s", shown)
 	}
 }

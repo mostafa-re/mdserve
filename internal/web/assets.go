@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"embed"
@@ -42,10 +42,10 @@ func vendorType(name string) string {
 	}
 }
 
-// serveVendor serves an embedded asset at /vendor/<name>. The name is cleaned so
+// ServeVendor serves an embedded asset at /vendor/<name>. The name is cleaned so
 // a "../" can't escape the embedded tree (defense in depth — embed.FS is already
 // sandboxed).
-func serveVendor(w http.ResponseWriter, r *http.Request, name string) {
+func ServeVendor(w http.ResponseWriter, r *http.Request, name string) {
 	clean := path.Clean("/" + name)[1:]
 	b, err := fs.ReadFile(vendorSub, clean)
 	if err != nil {
@@ -57,9 +57,9 @@ func serveVendor(w http.ResponseWriter, r *http.Request, name string) {
 	_, _ = w.Write(b)
 }
 
-// copyVendor writes the embedded vendor tree under outDir/vendor (used by the
+// CopyVendor writes the embedded vendor tree under outDir/vendor (used by the
 // static build so the generated site is also fully offline).
-func copyVendor(outDir string) error {
+func CopyVendor(outDir string) error {
 	return fs.WalkDir(vendorSub, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err

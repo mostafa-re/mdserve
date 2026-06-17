@@ -1,6 +1,10 @@
-package main
+// Package web holds mdserve's embedded front-end: the single-page reader shell
+// and the static-build page shell (both as HTML template strings), plus the
+// embedded vendor bundle (marked, highlight.js, mermaid, KaTeX + fonts) served
+// at /vendor/. Keeping it all here lets the binary stay fully offline.
+package web
 
-// pageHTML is the single-page reader shell, ported from the standalone Python
+// PageHTML is the single-page reader shell, ported from the standalone Python
 // md_reader.py and adapted for mdserve. It renders Markdown client-side with the
 // embedded vendor bundle (marked + highlight.js + mermaid + KaTeX, all under
 // /vendor/), so the page is fully offline. Differences from the original:
@@ -12,7 +16,7 @@ package main
 // The two sentinels __RELOAD__ and __DEFAULT__ are substituted per server in
 // NewServer (a JS boolean and the default-doc rel path). The doc tree, file
 // contents, and change polling come from /api/tree, /raw and /api/poll.
-const pageHTML = `<!doctype html>
+const PageHTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -997,7 +1001,7 @@ async function poll(){
 // bundle copied alongside so the static site is fully offline too. Sentinels
 // __ROOT__ (relative path to the output root), __TITLE__ and __BODY__ are
 // substituted per file.
-const buildShell = `<!doctype html>
+const BuildShell = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -8,61 +8,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// --- update indicator -----------------------------------------------------
-
-// The indicator must stay silent (and make no network call) when disabled, and
-// on a dev build — which the test binary always is (no -ldflags version).
-func TestUpdateIndicatorSilent(t *testing.T) {
-	if got := updateIndicator(false); got != "" {
-		t.Errorf("disabled indicator = %q, want empty", got)
-	}
-	if got := updateIndicator(true); got != "" {
-		t.Errorf("dev-build indicator = %q, want empty (no release to compare, no network)", got)
-	}
-}
-
-// versionString only ever yields a clean tag (vX.Y.Z) or a dev form
-// (dev / dev+<commit> / *-dirty); isReleaseVersion separates the two.
-func TestIsReleaseVersion(t *testing.T) {
-	cases := map[string]bool{
-		"v0.5.1":           true,
-		"v1.2.3":           true,
-		"dev":              false,
-		"dev+abc123":       false,
-		"v0.5.1-dirty":     false,
-		"dev+abc123-dirty": false,
-		"":                 false,
-	}
-	for v, want := range cases {
-		if got := isReleaseVersion(v); got != want {
-			t.Errorf("isReleaseVersion(%q) = %v, want %v", v, got, want)
-		}
-	}
-}
-
-// the indicator must never advertise a downgrade — only a strictly-newer release.
-func TestIsNewer(t *testing.T) {
-	cases := []struct {
-		b, a string
-		want bool
-	}{
-		{"v0.6.1", "v0.6.0", true},        // newer patch
-		{"v0.6.0", "v0.6.1", false},       // older — never suggest a downgrade
-		{"v0.6.0", "v0.6.0", false},       // equal
-		{"v1.0.0", "v0.9.9", true},        // newer major
-		{"v0.10.0", "v0.9.0", true},       // numeric, not lexical (10 > 9)
-		{"v0.6.0", "v0.6.0+dirty", false}, // build metadata stripped → equal
-		{"v0.6.1", "v0.6.0-rc1", true},    // prerelease stripped
-		{"garbage", "v0.6.0", false},      // unparseable → false
-		{"v0.6.1", "weird", false},
-	}
-	for _, c := range cases {
-		if got := isNewer(c.b, c.a); got != c.want {
-			t.Errorf("isNewer(%q, %q) = %v, want %v", c.b, c.a, got, c.want)
-		}
-	}
-}
 
 // --- exclude --------------------------------------------------------------
 

@@ -1,4 +1,7 @@
-package main
+// Package server serves the single-page Markdown reader and its data endpoints,
+// and renders the static build. Markdown is rendered in the browser (marked.js)
+// for the live reader; the static build renders it with internal/markdown.
+package server
 
 import (
 	"bufio"
@@ -14,9 +17,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomarkdown/markdown"
-	gohtml "github.com/gomarkdown/markdown/html"
-	"github.com/gomarkdown/markdown/parser"
+	"github.com/mostafa-re/mdserve/internal/ansi"
+	"github.com/mostafa-re/mdserve/internal/markdown"
+	"github.com/mostafa-re/mdserve/internal/web"
 )
 
 // faviconSVG is the mdserve mark, served at /favicon.svg and /favicon.ico so a
@@ -30,6 +33,7 @@ type Options struct {
 	DefaultDoc string   // rel path opened first when none is in the URL hash / history
 	Reload     bool     // when true (serve), the page polls /api/poll for live-reload
 	Exclude    []string // glob patterns of dirs/files to hide from serving and build
+	Version    string   // build version string, substituted into the reader's footer
 }
 
 // Server serves the single-page Markdown reader and its data endpoints. Markdown
@@ -78,8 +82,8 @@ func NewServer(opts Options) (*Server, error) {
 	page := strings.NewReplacer(
 		"__RELOAD__", reload,
 		"__DEFAULT__", opts.DefaultDoc,
-		"__VERSION__", versionString(),
-	).Replace(pageHTML)
+		"__VERSION__", opts.Version,
+	).Replace(web.PageHTML)
 	return &Server{docDir: abs, opts: opts, exclude: exclude, page: page}, nil
 }
 
@@ -142,7 +146,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case p == "/file":
 		s.serveFile(w, r)
 	case strings.HasPrefix(p, "/vendor/"):
-		serveVendor(w, r, strings.TrimPrefix(p, "/vendor/"))
+		web.ServeVendor(w, r, strings.TrimPrefix(p, "/vendor/"))
 	default:
 		http.NotFound(w, r)
 	}
@@ -272,9 +276,12 @@ func (s *Server) buildAPITree(absDir, rel string) []apiNode {
 	return out
 }
 
-// stats counts the .md files served and the distinct directories that contain
+// Dir returns the absolute root directory the server is serving.
+func (s *Server) Dir() string { return s.docDir }
+
+// Stats counts the .md files served and the distinct directories that contain
 // them (including the root) — reported at startup.
-func (s *Server) stats() (files, dirs int) {
+func (s *Server) Stats() (files, dirs int) {
 	m := s.flattenMtimes()
 	files = len(m)
 	seen := map[string]struct{}{".": {}}
@@ -291,16 +298,6 @@ func relJoin(rel, name string) string {
 		return name
 	}
 	return rel + "/" + name
-}
-
-// renderMarkdown converts a Markdown buffer to HTML (tables, fenced code,
-// autolinks, footnotes, heading IDs). Used by the static build only — the live
-// server renders Markdown in the browser.
-func renderMarkdown(src []byte) []byte {
-	exts := parser.CommonExtensions | parser.AutoHeadingIDs
-	p := parser.NewWithExtensions(exts)
-	renderer := gohtml.NewRenderer(gohtml.RendererOptions{Flags: gohtml.CommonFlags | gohtml.HrefTargetBlank})
-	return markdown.Render(p.Parse(src), renderer)
 }
 
 // extractTitle returns the first H1, or "" if the file doesn't lead with one.
@@ -324,7 +321,7 @@ func (s *Server) BuildStatic(outDir string) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
-	if err := copyVendor(outDir); err != nil {
+	if err := web.CopyVendor(outDir); err != nil {
 		return err
 	}
 	if err := s.copyAssets(outDir); err != nil {
@@ -347,8 +344,8 @@ func (s *Server) BuildStatic(outDir string) error {
 		}
 		depth := strings.Count(rel, "/")
 		root := strings.Repeat("../", depth)
-		body := string(renderMarkdown(raw))
-		shell := strings.NewReplacer("__ROOT__", root, "__TITLE__", htmlEsc.Replace(title)).Replace(buildShell)
+		body := string(markdown.Render(raw))
+		shell := strings.NewReplacer("__ROOT__", root, "__TITLE__", htmlEsc.Replace(title)).Replace(web.BuildShell)
 		shell = strings.Replace(shell, "__BODY__", body, 1)
 		outPath := filepath.Join(outDir, filepath.FromSlash(rel)+".html")
 		if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
@@ -434,23 +431,6 @@ func (w *statusWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// useColor enables ANSI coloring when stdout is a terminal and NO_COLOR is unset.
-var useColor = func() bool {
-	if os.Getenv("NO_COLOR") != "" {
-		return false
-	}
-	fi, err := os.Stdout.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
-}()
-
-// paint wraps s in an ANSI SGR code (no-op when color is disabled).
-func paint(code, s string) string {
-	if !useColor {
-		return s
-	}
-	return "\x1b[" + code + "m" + s + "\x1b[0m"
-}
-
 func statusColor(c int) string {
 	switch {
 	case c >= 500:
@@ -485,7 +465,7 @@ func durColor(d time.Duration) string {
 // Columns: time (gray), status (by class), method (gray), duration (by speed),
 // path. The 2s poll and the static vendor assets are skipped so the log stays a
 // readable record of page / doc / API views.
-func logRequests(h http.Handler) http.Handler {
+func LogRequests(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/poll" || strings.HasPrefix(r.URL.Path, "/vendor/") {
 			h.ServeHTTP(w, r)
@@ -503,10 +483,10 @@ func logRequests(h http.Handler) http.Handler {
 			target += "?" + r.URL.RawQuery
 		}
 		fmt.Printf("%s  %s  %s  %s  %s\n",
-			paint("90", start.Format("15:04:05.000")),
-			paint(statusColor(sw.status), fmt.Sprintf("%3d", sw.status)),
-			paint("90", fmt.Sprintf("%-4s", r.Method)),
-			paint(durColor(dur), fmt.Sprintf("%10s", dur.String())),
+			ansi.Paint("90", start.Format("15:04:05.000")),
+			ansi.Paint(statusColor(sw.status), fmt.Sprintf("%3d", sw.status)),
+			ansi.Paint("90", fmt.Sprintf("%-4s", r.Method)),
+			ansi.Paint(durColor(dur), fmt.Sprintf("%10s", dur.String())),
 			target,
 		)
 	})

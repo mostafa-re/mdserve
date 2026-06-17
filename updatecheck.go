@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mostafa-re/mdserve/internal/ansi"
 )
 
 // updateCheckTTL caps how often we reach GitHub: at most once per window, the
@@ -39,9 +41,9 @@ func updateIndicator(enabled bool) string {
 	// Only a strictly-newer release is an update — never suggest a downgrade when
 	// this build is ahead of the latest published release.
 	if isNewer(latest, cur) {
-		return paint("33", "● update available: "+latest+" — run: mdserve update")
+		return ansi.Paint("33", "● update available: "+latest+" — run: mdserve update")
 	}
-	return paint("32", "● latest")
+	return ansi.Paint("32", "● latest")
 }
 
 // isNewer reports whether release tag b is strictly newer than a (both vX.Y.Z).
