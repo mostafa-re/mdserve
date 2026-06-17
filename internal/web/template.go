@@ -609,7 +609,7 @@ function enhance(relpath){
   });
 }
 const slug = t => t.toLowerCase().trim()
-  .replace(/[^\w\s-]/g,"").replace(/\s+/g,"-").replace(/-+/g,"-") || "section";
+  .replace(/[^\p{L}\p{N}\s_-]/gu,"").replace(/\s+/g,"-").replace(/-+/g,"-").replace(/^-+|-+$/g,"") || "section";
 function normalizePath(p){
   const out=[]; for(const seg of p.split("/")){
     if(seg===".."){ out.pop(); } else if(seg!=="." && seg!=="") out.push(seg);
