@@ -37,7 +37,7 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/mostafa-re/mdserve
-    description: Tiny dependency-light Markdown docs server with live-reload
+    description: Tiny zero-dependency Markdown docs server with live-reload
     license: MIT
 
 release:

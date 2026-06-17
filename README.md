@@ -1,8 +1,9 @@
 # <img src="icon.svg" alt="" width="28" align="absmiddle"> mdserve
 
-A tiny, dependency-light Markdown docs server. Point it at a directory of `.md`
-files and browse them as HTML with a live left-nav; or render them to a static
-site.
+A tiny, **zero-dependency** Markdown docs server. Point it at a directory of
+`.md` files and browse them as HTML with a live left-nav; or render them to a
+static site. One static Go binary, pure standard library — no third-party
+modules.
 
 ## Great for
 
@@ -166,13 +167,19 @@ it's a convenience filter — not a security boundary.
 
 ## Design
 
-One static Go binary. Markdown is rendered client-side by marked.js; the file
-tree (`/api/tree`), file contents (`/raw`), and change polling (`/api/poll`)
-are tiny JSON/text endpoints. The front-end vendor bundle — marked,
-highlight.js, Mermaid, KaTeX (+ its fonts) — is embedded with `go:embed` and
-served from `/vendor/`, so both the live reader and the static build work with
-no network. Live-reload is an mtime poll, so there is zero extra dependency and
-identical behavior across OSes. `gomarkdown` renders the static build only.
+One static Go binary, **zero third-party dependencies** — pure standard library.
+Markdown is rendered client-side by marked.js; the file tree (`/api/tree`), file
+contents (`/raw`), and change polling (`/api/poll`) are tiny JSON/text endpoints.
+The front-end vendor bundle — marked, highlight.js, Mermaid, KaTeX (+ its fonts)
+— is embedded with `go:embed` and served from `/vendor/`, so both the live
+reader and the static build work with no network. Live-reload is an mtime poll,
+so behavior is identical across OSes. The static build pre-renders Markdown with
+a small, self-contained renderer (a GFM subset) in `internal/markdown`.
+
+The code is a thin `main` (CLI, version, self-update) over `internal/` packages:
+`server` (HTTP endpoints + static build), `web` (the embedded reader UI and
+vendor bundle), `markdown` (the static-build renderer), and `ansi` (terminal
+coloring).
 
 ## Use in a project
 

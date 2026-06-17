@@ -1,7 +1,8 @@
 // Command mdserve serves a directory of Markdown files as browsable HTML, or
 // renders them to a static site: free-port fallback, browser auto-open, and
-// live-reload on save. Intentionally dependency-light — one markdown library,
-// stdlib for everything else.
+// live-reload on save. Zero third-party dependencies — pure standard library,
+// with a small built-in Markdown renderer (internal/markdown) for the static
+// build.
 package main
 
 import (
