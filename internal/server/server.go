@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"io/fs"
 	"net/http"
@@ -81,10 +82,15 @@ func NewServer(opts Options) (*Server, error) {
 	}
 	page := strings.NewReplacer(
 		"__RELOAD__", reload,
-		"__DEFAULT__", opts.DefaultDoc,
-		"__VERSION__", opts.Version,
+		"__DEFAULT__", jsonString(opts.DefaultDoc),
+		"__VERSION__", html.EscapeString(opts.Version),
 	).Replace(web.PageHTML)
 	return &Server{docDir: abs, opts: opts, exclude: exclude, page: page}, nil
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 // isExcluded reports whether a slash-separated path under docDir matches any
@@ -123,7 +129,7 @@ func (s *Server) isExcluded(rel string) bool {
 //	GET /api/poll         → JSON {relpath: mtime} for live-reload
 //	GET /raw?path=<rel>   → raw Markdown bytes (path-safe, .md only)
 //	GET /vendor/<name>    → embedded vendor asset
-//	anything else         → 404
+//	GET /<path>           → reader for Markdown/directories, or a local asset
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch p := r.URL.Path; {
 	case p == "/" || p == "/index.html":
@@ -148,7 +154,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(p, "/vendor/"):
 		web.ServeVendor(w, r, strings.TrimPrefix(p, "/vendor/"))
 	default:
-		http.NotFound(w, r)
+		f, info, err := s.openPath(p)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer f.Close()
+		if info.IsDir() || strings.EqualFold(path.Ext(p), ".md") {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = io.WriteString(w, s.page)
+		} else {
+			http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+		}
 	}
 }
 
@@ -161,14 +178,24 @@ func writeJSON(w http.ResponseWriter, v any) {
 // serveRaw returns the raw Markdown for ?path=<rel>, resolved safely inside
 // docDir.
 func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request) {
-	full, ok := s.resolveMd(r.URL.Query().Get("path"))
-	if !ok {
+	rel := r.URL.Query().Get("path")
+	if !strings.EqualFold(path.Ext(rel), ".md") {
 		http.NotFound(w, r)
 		return
 	}
-	b, err := os.ReadFile(full)
+	f, info, err := s.openPath(rel)
 	if err != nil {
-		http.Error(w, "read: "+err.Error(), http.StatusInternalServerError)
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	if info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		http.Error(w, "could not read file", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
@@ -178,42 +205,45 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request) {
 
 // serveFile serves any file referenced by a doc (images, etc.) from ?path=<rel>,
 // resolved safely inside docDir — so ![](diagram.png), <img src="x.svg"> and
-// links to local assets work. http.ServeFile handles content types and ranges.
+// links to local assets work. ServeContent handles content types and ranges
+// using the already-opened file, without reopening a potentially changed symlink.
 func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
-	full, ok := s.resolvePath(r.URL.Query().Get("path"))
-	if !ok {
+	f, info, err := s.openPath(r.URL.Query().Get("path"))
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, full)
+	defer f.Close()
+	if info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 
-// resolvePath maps a slash rel path to an absolute file (any type) inside docDir,
-// or returns ok=false. path.Clean on a rooted copy neutralizes "../" traversal,
-// and a prefix check guards against any residual escape.
-func (s *Server) resolvePath(rel string) (string, bool) {
-	clean := filepath.FromSlash(path.Clean("/" + rel))
-	full := filepath.Join(s.docDir, clean)
-	sep := string(filepath.Separator)
-	if full != s.docDir && !strings.HasPrefix(full+sep, s.docDir+sep) {
-		return "", false
+// openPath confines reads to docDir, including symlinks and concurrent changes
+// to them. Keep the opened descriptor through the read instead of checking an
+// absolute path and reopening it later.
+func (s *Server) openPath(rel string) (*os.File, os.FileInfo, error) {
+	clean := path.Clean("/" + rel)[1:]
+	if clean == "" {
+		clean = "."
 	}
-	if s.isExcluded(path.Clean("/" + rel)[1:]) {
-		return "", false
+	for p := clean; p != "."; p = path.Dir(p) {
+		if s.isExcluded(p) {
+			return nil, nil, fs.ErrNotExist
+		}
 	}
-	if info, err := os.Stat(full); err != nil || info.IsDir() {
-		return "", false
+	f, err := os.OpenInRoot(s.docDir, filepath.FromSlash(clean))
+	if err != nil {
+		return nil, nil, err
 	}
-	return full, true
-}
-
-// resolveMd is resolvePath restricted to .md files.
-func (s *Server) resolveMd(rel string) (string, bool) {
-	full, ok := s.resolvePath(rel)
-	if !ok || !strings.HasSuffix(strings.ToLower(full), ".md") {
-		return "", false
+	info, err := f.Stat()
+	if err != nil || (!info.IsDir() && !info.Mode().IsRegular()) {
+		f.Close()
+		return nil, nil, fs.ErrNotExist
 	}
-	return full, true
+	return f, info, nil
 }
 
 // apiNode is one entry in the /api/tree JSON: a directory (with Children) or a
@@ -318,6 +348,11 @@ var htmlEsc = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 // outDir, and copies the embedded vendor bundle alongside, so the result is a
 // fully-offline static site. Used by `mdserve build`.
 func (s *Server) BuildStatic(outDir string) error {
+	root, err := os.OpenRoot(s.docDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
@@ -334,7 +369,7 @@ func (s *Server) BuildStatic(outDir string) error {
 	}
 	sort.Strings(rels)
 	for _, rel := range rels {
-		raw, err := os.ReadFile(filepath.Join(s.docDir, filepath.FromSlash(rel)))
+		raw, err := root.ReadFile(filepath.FromSlash(rel))
 		if err != nil {
 			return err
 		}
@@ -390,12 +425,12 @@ func (s *Server) copyAssets(outDir string) error {
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}
-		return copyFile(p, dst)
+		return s.copyFile(slashRel, dst)
 	})
 }
 
-func copyFile(src, dst string) (err error) {
-	in, err := os.Open(src)
+func (s *Server) copyFile(src, dst string) (err error) {
+	in, _, err := s.openPath(src)
 	if err != nil {
 		return err
 	}

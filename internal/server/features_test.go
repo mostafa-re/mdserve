@@ -96,13 +96,27 @@ func TestExcludeHiddenFromAPIs(t *testing.T) {
 
 func TestExcludeBlocksDirectAccess(t *testing.T) {
 	srv, _ := excludeTree(t)
-	for _, p := range []string{"/raw?path=secret/plan.md", "/raw?path=notes/draft.private.md", "/file?path=secret/data.bin"} {
+	for _, p := range []string{"/raw?path=secret/plan.md", "/raw?path=notes/draft.private.md", "/file?path=secret/data.bin", "/secret/plan.md", "/secret/", "/notes/draft.private.md"} {
 		if get(t, srv, p).Code == http.StatusOK {
 			t.Errorf("%s reached an excluded path (got 200)", p)
 		}
 	}
 	if get(t, srv, "/raw?path=guide/intro.md").Code != http.StatusOK {
 		t.Errorf("a non-excluded doc should still be served")
+	}
+}
+
+func TestExcludeDirectoryPatternBlocksDescendants(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "drafts", "sub", "plan.md"), "# Private\n")
+	srv, err := NewServer(Options{Dir: dir, Exclude: []string{"drafts/*"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"/drafts/sub/plan.md", "/raw?path=drafts/sub/plan.md", "/file?path=drafts/sub/plan.md"} {
+		if rec := get(t, srv, target); rec.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", target, rec.Code)
+		}
 	}
 }
 

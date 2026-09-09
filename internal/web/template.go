@@ -25,7 +25,7 @@ const PageHTML = `<!doctype html>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f81f7'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link id="hljs-theme" rel="stylesheet" href="/vendor/hljs-dark.css">
 <link rel="stylesheet" href="/vendor/katex.min.css">
-<script>window.MDSERVE={reload:__RELOAD__,defaultDoc:"__DEFAULT__"};</script>
+<script>window.MDSERVE={reload:__RELOAD__,defaultDoc:__DEFAULT__};</script>
 <style>
 :root{
   --speed:.18s;
@@ -358,7 +358,7 @@ mark.find.cur{background:#ff9f43;color:#000;box-shadow:0 0 0 2px #e07b1e}
 "use strict";
 const $ = s => document.querySelector(s);
 const page = $("#page"), viewport = $("#viewport"), toc = $("#toc"), canvas = $("#canvas");
-let state = { path:null, zoom:1, tool:"select", theme:"dark", mtimes:{}, treeKey:"", obs:null };
+let state = { path:null, zoom:1, tool:"select", theme:"dark", mtimes:{}, treeKey:"", tree:[], rootPath:"", obs:null };
 let bootTarget = "";
 const THEMES = ["warm","light","dark"];
 const mermaidTheme = t => t==="dark" ? "dark" : (t==="warm" ? "neutral" : "default");
@@ -408,6 +408,8 @@ marked.setOptions({ gfm:true, breaks:false, headerIds:false, mangle:false });
 /* ---------- file tree ---------- */
 async function loadTree(){
   const data = await (await fetch("/api/tree")).json();
+  state.tree = data.tree;
+  state.rootPath = (data.rootPath || "").replace(/\\/g,"/").replace(/\/$/,"");
   $("#rootname").textContent = data.root || "";
   $("#rootname").title = data.rootPath || data.root || "";
   const key = JSON.stringify(stripMtime(data.tree));
@@ -417,18 +419,24 @@ async function loadTree(){
   $("#tree").appendChild(renderNodes(data.tree));
   highlightActive();
   if(!state.path){
-    const want = bootTarget && fileInTree(bootTarget, data.tree) ? bootTarget : firstFile(data.tree);
+    const direct = location.pathname!=="/" && location.pathname!=="/index.html" ? decodePath(location.pathname) : "";
+    const want = docInTree(normalizePath(bootTarget), data.tree) || (direct && docInTree(normalizePath(direct), data.tree))
+      || (location.hash || direct ? bootTarget : firstFile(data.tree));
     if(want) openFile(want);
     else showEmpty();
   }
   return data;
 }
-function fileInTree(rel, nodes){
+function docInTree(rel, nodes){
+  if(!rel) return firstFile(nodes);
   for(const n of nodes){
-    if(n.type==="file" && n.relpath===rel) return true;
-    if(n.type==="dir" && fileInTree(rel, n.children||[])) return true;
+    if(n.relpath===rel) return n.type==="file" ? rel : firstFile(n.children||[]);
+    if(n.type==="dir"){
+      const found = docInTree(rel, n.children||[]);
+      if(found) return found;
+    }
   }
-  return false;
+  return null;
 }
 function stripMtime(nodes){
   return nodes.map(n => n.type==="dir"
@@ -493,12 +501,16 @@ function highlightActive(){
 const cssEsc = s => s.replace(/["\\]/g, "\\$&");
 
 /* ---------- open + render a markdown file ---------- */
-async function openFile(relpath, keepScroll){
+async function openFile(relpath, keepScroll, anchor){
   if(state.path && state.path!==relpath) saveScrollNow();
   const prevRatio = keepScroll ? viewport.scrollTop / Math.max(1, viewport.scrollHeight) : 0;
   let md;
-  try{ md = await (await fetch("/raw?path="+encodeURIComponent(relpath))).text(); }
-  catch(e){ md = "# Could not load\n\n` + "`" + `"+relpath+"` + "`" + `"; }
+  try{
+    const response = await fetch("/raw?path="+encodeURIComponent(relpath));
+    if(!response.ok) throw new Error(response.status);
+    md = await response.text();
+  }
+  catch(e){ md = "# Could not load"; }
   state.path = relpath;
   $("#empty")?.remove();
   page.style.display = "";
@@ -518,12 +530,13 @@ async function openFile(relpath, keepScroll){
   if($("#findbar").classList.contains("show")) runFind($("#find-in").value);
   setTimeout(()=>{ layoutPage(); applyTransform();
     if(!keepScroll) applyRatio(savedRatio(relpath));
+    if(anchor) scrollToEl(document.getElementById(decodePath(anchor.slice(1))));
     updateProgress(); updateFab(); }, 80);
 }
 function crumb(relpath){
   const parts = relpath.split("/");
   const file = parts.pop().replace(/\.md$/i,"");
-  $("#crumb").innerHTML = (parts.length? parts.join(" / ")+" / ":"") + "<b>"+esc(file)+"</b>";
+  $("#crumb").innerHTML = (parts.length? esc(parts.join(" / "))+" / ":"") + "<b>"+esc(file)+"</b>";
 }
 const esc = s => s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 
@@ -575,32 +588,37 @@ function enhance(relpath){
     if(seen[id]!=null){ seen[id]++; id=id+"-"+seen[id]; } else seen[id]=0;
     h.id = id;
   });
-  const dir = relpath.includes("/") ? relpath.slice(0,relpath.lastIndexOf("/")+1) : "";
   page.querySelectorAll("a[href]").forEach(a=>{
     const href = a.getAttribute("href");
     if(href.startsWith("#")){
       a.onclick = e=>{ e.preventDefault();
-        const id = decodeURIComponent(href.slice(1));
+        const id = decodePath(href.slice(1));
         const t = document.getElementById(id)
                || [...page.querySelectorAll("[id]")].find(el=>el.id===id);
         scrollToEl(t);
       };
-    } else if(/^[a-z]+:\/\//i.test(href) || href.startsWith("//") || href.startsWith("mailto:")){
-      a.target="_blank"; a.rel="noopener noreferrer";
-    } else if(/\.md(#.*)?$/i.test(href)){
-      a.onclick = e=>{ e.preventDefault();
-        const clean = href.split("#")[0];
-        openFile(normalizePath(dir+clean)); };
     } else {
-      a.setAttribute("href", fileURL(dir+href.split("#")[0]));
+      const local = localURL(href, relpath);
+      if(local){
+        const doc = docInTree(local.path, state.tree) || (/\.md$/i.test(local.path) ? local.path : null);
+        if(doc){
+          a.setAttribute("href", "/#"+encodeURIComponent(doc));
+          a.onclick = e=>{ e.preventDefault(); openFile(doc, false, local.hash); };
+          return;
+        }
+        a.setAttribute("href", fileURL(local.path)+local.hash);
+      } else if(!/^(https?:|mailto:|tel:|\/\/)/i.test(href)){
+        a.removeAttribute("href");
+      }
       a.target="_blank"; a.rel="noopener noreferrer";
     }
   });
-  // local images / assets (png, svg, gif, …) → served from disk via /file,
-  // resolved relative to this doc's directory; skip absolute / data / anchor srcs
+  // Resolve images with the same URL rules as links, including root-relative
+  // paths and encoded filenames. Remote and data URLs stay untouched.
   page.querySelectorAll("img[src]").forEach(img=>{
     const src=img.getAttribute("src");
-    if(src && !/^([a-z]+:|\/\/|\/|data:|#)/i.test(src)) img.setAttribute("src", fileURL(dir+src));
+    const local = src && !src.startsWith("#") && localURL(src, relpath);
+    if(local) img.setAttribute("src", fileURL(local.path)+local.hash);
   });
   page.querySelectorAll("table").forEach(t=>{
     if(t.parentElement && t.parentElement.classList.contains("table-wrap")) return;
@@ -615,8 +633,34 @@ function normalizePath(p){
     if(seg===".."){ out.pop(); } else if(seg!=="." && seg!=="") out.push(seg);
   } return out.join("/");
 }
+function decodePath(p){
+  try{ return decodeURIComponent(p); }catch(e){ return p; }
+}
+// Resolve against the document, not the reader shell at /. Decode only after
+// URL parsing, so encoded spaces, # and ? remain part of the filename. Absolute
+// disk paths are mapped only when they lie inside the configured document root.
+function localURL(href, relpath){
+  let url;
+  try{ url = new URL(href, location.origin+"/"+relpath.split("/").map(encodeURIComponent).join("/")); }
+  catch(e){ return null; }
+  let p = decodePath(url.pathname);
+  const root = state.rootPath;
+  const inRoot = root && (p===root || p.startsWith(root+"/"));
+  if(url.protocol==="file:"){
+    if((url.hostname && url.hostname!=="localhost") || !inRoot) return null;
+  } else if(url.origin!==location.origin){
+    return null;
+  }
+  if(inRoot) p = p.slice(root.length);
+  return {path:normalizePath(p), hash:url.hash};
+}
 // URL for a local asset (image, etc.) served by the backend, relative to a doc
 const fileURL = p => "/file?path=" + encodeURIComponent(normalizePath(p));
+window.addEventListener("hashchange", ()=>{
+  const rel = normalizePath(decodePath(location.hash.slice(1)));
+  const doc = docInTree(rel, state.tree) || rel;
+  if(doc && doc!==state.path) openFile(doc);
+});
 
 /* scroll viewport so an element reaches the top — works through #page's transform */
 function scrollToEl(el){
@@ -984,7 +1028,8 @@ async function poll(){
   layoutPage();
   const z0 = parseFloat(localStorage.getItem("mdr-zoom"));
   if(z0 && z0>0) applyZoom(z0);
-  bootTarget = (location.hash ? decodeURIComponent(location.hash.slice(1)) : "")
+  bootTarget = (location.hash ? decodePath(location.hash.slice(1)) : "")
+             || (location.pathname!=="/" && location.pathname!=="/index.html" ? decodePath(location.pathname) : "")
              || localStorage.getItem("mdr-last")
              || (window.MDSERVE && window.MDSERVE.defaultDoc) || "";
   loadTree().then(()=>{
