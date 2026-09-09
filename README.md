@@ -56,7 +56,8 @@ network.
   (time · status · method · duration · path).
 - **Static build** — `mdserve build` renders a self-contained, offline HTML
   tree (the vendor bundle is copied alongside).
-- Path-traversal-safe; serves only `.md` under the configured root.
+- Path-traversal-safe; renders `.md` and serves local assets under the configured
+  root. Symlinks that escape that root are rejected.
 
 ## Rich content, rendered offline
 
@@ -164,6 +165,11 @@ mdserve serve --exclude node_modules --exclude "*.private.md"  # hide paths
 `--exclude` hides matching paths from the nav, direct URLs, and the static
 build. It matches by path name (case-insensitively), not by symlink target, so
 it's a convenience filter — not a security boundary.
+
+In the live reader, links and images resolve relative to the current document;
+paths starting with `/` resolve from the served root. Absolute disk paths inside
+`--dir` are mapped back to that root. Direct document URLs and directory links
+work too; a directory opens its README, index/home, or first available document.
 
 ## Design
 

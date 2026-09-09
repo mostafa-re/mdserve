@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,6 +136,101 @@ func TestRawServesMarkdown(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "# Intro") {
 		t.Errorf("raw markdown missing heading:\n%s", rec.Body.String())
+	}
+}
+
+func TestDirectDocumentPaths(t *testing.T) {
+	srv, dir := newTestServer(t)
+	mustWrite(t, filepath.Join(dir, "guide", "space #?.md"), "# Encoded\n")
+	for _, target := range []string{"/guide", "/guide/", "/guide/intro.md", "/guide/space%20%23%3F.md"} {
+		rec := get(t, srv, target)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "window.MDSERVE") {
+			t.Errorf("%s: status %d, expected reader shell", target, rec.Code)
+		}
+		if rec.Header().Get("Location") != "" {
+			t.Errorf("%s unexpectedly redirected", target)
+		}
+	}
+	for _, target := range []string{"/missing", "/guide/missing.md"} {
+		if rec := get(t, srv, target); rec.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", target, rec.Code)
+		}
+	}
+	rec := get(t, srv, "/raw?path="+url.QueryEscape("guide/space #?.md"))
+	if rec.Code != http.StatusOK || rec.Body.String() != "# Encoded\n" {
+		t.Fatalf("encoded filename: status %d, body %q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestFilePathsAndRanges(t *testing.T) {
+	srv, dir := newTestServer(t)
+	mustWrite(t, filepath.Join(dir, "guide", "image #.svg"), "<svg>test</svg>")
+	for _, target := range []string{"/guide/image%20%23.svg", "/file?path=" + url.QueryEscape("guide/image #.svg")} {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		req.Header.Set("Range", "bytes=0-4")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		if rec.Code != http.StatusPartialContent || rec.Body.String() != "<svg>" {
+			t.Errorf("%s: status %d, body %q", target, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestSymlinksCannotEscapeRoot(t *testing.T) {
+	srv, dir := newTestServer(t)
+	outside := t.TempDir()
+	mustWrite(t, filepath.Join(outside, "secret.md"), "outside secret")
+	for name, target := range map[string]string{
+		"leak.md":   filepath.Join(outside, "secret.md"),
+		"leak":      outside,
+		"inside.md": filepath.Join("guide", "intro.md"),
+	} {
+		if err := os.Symlink(target, filepath.Join(dir, name)); err != nil {
+			t.Skipf("symlinks unavailable: %v", err)
+		}
+	}
+	for _, target := range []string{
+		"/raw?path=leak.md", "/file?path=leak.md", "/leak.md",
+		"/raw?path=leak/secret.md", "/file?path=leak/secret.md", "/leak/secret.md", "/leak/",
+	} {
+		if rec := get(t, srv, target); rec.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", target, rec.Code)
+		}
+	}
+	if rec := get(t, srv, "/raw?path=inside.md"); rec.Code != http.StatusOK {
+		t.Errorf("relative symlink inside root: status %d, want 200", rec.Code)
+	}
+}
+
+func TestBuildRejectsOutsideSymlinks(t *testing.T) {
+	for _, name := range []string{"leak.md", "leak.txt"} {
+		t.Run(name, func(t *testing.T) {
+			srv, dir := newTestServer(t)
+			outside := filepath.Join(t.TempDir(), "secret")
+			mustWrite(t, outside, "outside secret")
+			if err := os.Symlink(outside, filepath.Join(dir, name)); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			if err := srv.BuildStatic(t.TempDir()); err == nil {
+				t.Fatal("build must reject symlinks outside its root")
+			}
+		})
+	}
+}
+
+func TestDefaultDocEscaped(t *testing.T) {
+	value := "quotes\"\\</script><script>alert(1)</script>\u2028.md"
+	srv, err := NewServer(Options{Dir: t.TempDir(), DefaultDoc: value, Version: "<img src=x>"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := strings.SplitN(strings.SplitN(srv.page, "defaultDoc:", 2)[1], "};</script>", 2)[0]
+	var got string
+	if err := json.Unmarshal([]byte(config), &got); err != nil || got != value {
+		t.Fatalf("defaultDoc failed to round trip: %q, %v", got, err)
+	}
+	if strings.Contains(config, "</script>") || strings.Contains(srv.page, "<img src=x>") {
+		t.Fatal("configuration injected HTML")
 	}
 }
 
